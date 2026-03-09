@@ -1,0 +1,23 @@
+{
+  "name": "event-manager",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "scripts": {
+    "dev:web": "npm run dev -w @event-manager/web",
+    "dev:api": "npm run start:dev -w @event-manager/api",
+    "build": "npm run build -ws --if-present",
+    "lint": "npm run lint -ws --if-present",
+    "test": "npm run test -ws --if-present",
+    "format": "npm run format -ws --if-present",
+    "db:generate": "npm run prisma:generate -w @event-manager/api",
+    "db:migrate": "npm run prisma:migrate -w @event-manager/api",
+    "seed": "npm run seed -w @event-manager/api"
+  }
+}
