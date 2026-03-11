@@ -108,6 +108,7 @@ Wichtig:
 - in `production` ist `SEED_ADMIN_PASSWORD` Pflicht
 - der Seed macht ein `upsert` auf die E-Mail
 - damit kann der Admin sauber aktualisiert werden, ohne die Datenbank zu leeren
+- der Seed-Container generiert vor dem Lauf seinen Prisma-Client selbst
 
 ## Update-Deploy
 
