@@ -22,4 +22,4 @@ COPY --from=build /app/apps/api/package.json apps/api/package.json
 COPY --from=build /app/apps/api/tsconfig.json apps/api/tsconfig.json
 COPY --from=build /app/packages/types packages/types
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma generate --schema apps/api/prisma/schema.prisma && npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && node apps/api/dist/main"]
+CMD ["sh", "-c", "npm run prisma:generate -w @event-manager/api && npm run prisma:deploy -w @event-manager/api && node apps/api/dist/main"]
