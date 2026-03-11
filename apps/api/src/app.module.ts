@@ -4,6 +4,9 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AuthModule } from "./auth/auth.module";
 import { ContactsModule } from "./contacts/contacts.module";
+import { EventsModule } from "./events/events.module";
+import { GuestModule } from "./guest/guest.module";
+import { MailModule } from "./mail/mail.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
@@ -12,6 +15,9 @@ import { PrismaModule } from "./prisma/prisma.module";
     PrismaModule,
     AuthModule,
     ContactsModule,
+    EventsModule,
+    MailModule,
+    GuestModule,
   ],
   controllers: [AppController],
   providers: [AppService],

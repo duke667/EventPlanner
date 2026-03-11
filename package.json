@@ -18,6 +18,9 @@
     "format": "npm run format -ws --if-present",
     "db:generate": "npm run prisma:generate -w @event-manager/api",
     "db:migrate": "npm run prisma:migrate -w @event-manager/api",
-    "seed": "npm run seed -w @event-manager/api"
+    "seed": "npm run seed -w @event-manager/api",
+    "docker:test:up": "docker-compose -f docker-compose.testsystem.yml --env-file .env.test up -d --build",
+    "docker:test:down": "docker-compose -f docker-compose.testsystem.yml --env-file .env.test down",
+    "docker:test:seed": "docker-compose -f docker-compose.testsystem.yml --env-file .env.test --profile tools run --rm seed-admin"
   }
 }

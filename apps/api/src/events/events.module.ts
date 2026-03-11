@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
-import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { ContactsController } from "./contacts.controller";
-import { ContactImportService } from "./contact-import.service";
-import { ContactsService } from "./contacts.service";
+import { JwtModule } from "@nestjs/jwt";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { GuestTokenService } from "../guest/guest-token.service";
+import { EventsController } from "./events.controller";
+import { EventsService } from "./events.service";
 
 @Module({
   imports: [
@@ -17,7 +17,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
       }),
     }),
   ],
-  controllers: [ContactsController],
-  providers: [ContactsService, ContactImportService, JwtAuthGuard],
+  controllers: [EventsController],
+  providers: [EventsService, JwtAuthGuard, GuestTokenService],
 })
-export class ContactsModule {}
+export class EventsModule {}

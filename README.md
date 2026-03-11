@@ -17,6 +17,7 @@ Das System soll folgende Prozesse abdecken:
 
 - [Produktkonzept](./docs/produktkonzept.md)
 - [Technik-Setup](./docs/technik-setup.md)
+- [Deployment Testsystem](./docs/deployment-testsystem.md)
 
 ## Projektstruktur
 
@@ -72,9 +73,21 @@ Lokaler Admin-Seed:
 
 ## Naechster Schritt
 
-Nach dem Grundgeruest bauen wir als erstes die Kernmodule:
+Die fachliche Kernkette ist lokal vorhanden. Der naechste operative Schritt ist jetzt das Testsystem-Deployment.
 
-- Mitarbeiter-Auth
-- Kontakte inkl. Import
-- Eventverwaltung
-- Einladungen und Gastregistrierung
+## Testsystem-Deployment
+
+Fuer das Testsystem gibt es jetzt:
+
+- Compose-Setup in [docker-compose.testsystem.yml](./docker-compose.testsystem.yml)
+- Env-Vorlage in [.env.test.example](./.env.test.example)
+- Dockerfiles fuer [apps/api](./apps/api/Dockerfile) und [apps/web](./apps/web/Dockerfile)
+- Deploy-Anleitung in [docs/deployment-testsystem.md](./docs/deployment-testsystem.md)
+
+Schnellstart:
+
+```bash
+cp .env.test.example .env.test
+docker-compose -f docker-compose.testsystem.yml --env-file .env.test up -d --build
+docker-compose -f docker-compose.testsystem.yml --env-file .env.test --profile tools run --rm seed-admin
+```

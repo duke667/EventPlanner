@@ -5,28 +5,38 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@example.com";
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!";
-  const passwordHash = await argon2.hash(password);
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  const firstName = process.env.SEED_ADMIN_FIRST_NAME ?? "Admin";
+  const lastName = process.env.SEED_ADMIN_LAST_NAME ?? "User";
+
+  if (!password) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SEED_ADMIN_PASSWORD is required in production.");
+    }
+  }
+
+  const effectivePassword = password ?? "ChangeMe123!";
+  const passwordHash = await argon2.hash(effectivePassword);
 
   const user = await prisma.user.upsert({
     where: { email },
     update: {
-      firstName: "Admin",
-      lastName: "User",
+      firstName,
+      lastName,
       passwordHash,
       role: UserRole.ADMIN,
     },
     create: {
       email,
-      firstName: "Admin",
-      lastName: "User",
+      firstName,
+      lastName,
       passwordHash,
       role: UserRole.ADMIN,
     },
   });
 
   console.log(
-    `Seeded admin user ${user.email} with password ${password}. Change this immediately outside local development.`,
+    `Seeded admin user ${user.email} with password ${effectivePassword}. Change this immediately outside local development.`,
   );
 }
 
