@@ -9,8 +9,8 @@ import type {
   LoginResponse,
 } from "@event-manager/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const STORAGE_KEY = "event-manager-session";
+const API_PROXY_BASE = "/backend-api";
 
 type SessionState = LoginResponse | null;
 
@@ -111,7 +111,7 @@ async function apiRequest<T>(
   options: RequestInit = {},
   token?: string,
 ): Promise<T> {
-  const response = await fetch(`${API_URL}/api${path}`, {
+  const response = await fetch(`${API_PROXY_BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -368,7 +368,7 @@ export function Dashboard() {
       const formData = new FormData();
       formData.append("file", file);
 
-      fetch(`${API_URL}/api/contacts/import`, {
+      fetch(`${API_PROXY_BASE}/contacts/import`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.accessToken}`,

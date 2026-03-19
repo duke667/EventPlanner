@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState, useTransition } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_PROXY_BASE = "/backend-api";
 
 type InvitationPayload = {
   id: string;
@@ -50,7 +50,7 @@ export function GuestExperience({ token }: { token: string }) {
     let active = true;
 
     startTransition(() => {
-      fetch(`${API_URL}/api/guest/invitation/${token}`)
+      fetch(`${API_PROXY_BASE}/guest/invitation/${token}`)
         .then(async (result) => {
           if (!result.ok) {
             const payload = await result.json().catch(() => null);
@@ -87,7 +87,7 @@ export function GuestExperience({ token }: { token: string }) {
     setSuccess(null);
 
     startTransition(() => {
-      fetch(`${API_URL}/api/guest/invitation/${token}/respond`, {
+      fetch(`${API_PROXY_BASE}/guest/invitation/${token}/respond`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -197,7 +197,7 @@ export function GuestExperience({ token }: { token: string }) {
 
             {success ? <p className="success-box">{success}</p> : null}
 
-            <a className="guest-link" href={`${API_URL}/api/guest/invitation/${token}/ics`}>
+            <a className="guest-link" href={`${API_PROXY_BASE}/guest/invitation/${token}/ics`}>
               ICS-Datei herunterladen
             </a>
           </>

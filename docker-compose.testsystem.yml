@@ -81,6 +81,7 @@ services:
       - .env.test
     environment:
       PORT: 3000
+      API_INTERNAL_URL: http://api:4000
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:

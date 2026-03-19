@@ -86,13 +86,16 @@ Fuer ein sauberes Testsetup sollten `web` und `api` spaeter hinter einem Reverse
 
 Aktuelle Annahme im Frontend:
 
-- `NEXT_PUBLIC_API_URL` zeigt auf die Basis-URL der API
-- die Anwendung haengt selbst `/api` an Requests an
+- der Browser spricht nur den Web-Container an
+- der Web-Container proxyt Requests intern auf die API
+- `API_INTERNAL_URL` ist die intern erreichbare API-Adresse fuer den Web-Container
+- `NEXT_PUBLIC_API_URL` bleibt fuer direkte API-Links und Dokumentation relevant
 
 Das bedeutet:
 
-- richtig: `https://api.events-test.example.com`
-- falsch: `https://api.events-test.example.com/api`
+- intern im Compose-Setup: `API_INTERNAL_URL=http://api:4000`
+- extern fuer direkte API-Aufrufe oder spaeteren Proxy: `NEXT_PUBLIC_API_URL=https://api.events-test.example.com`
+- falsch: `NEXT_PUBLIC_API_URL=https://api.events-test.example.com/api`
 
 ## Admin-Seed
 
