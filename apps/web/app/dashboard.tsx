@@ -1,6 +1,15 @@
 "use client";
 
-import { FormEvent, useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import {
+  FormEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import type {
   Contact,
   ContactImportResult,
@@ -11,6 +20,24 @@ import type {
 
 const STORAGE_KEY = "event-manager-session";
 const API_PROXY_BASE = "/backend-api";
+
+const BACKOFFICE_SECTIONS = [
+  { id: "overview", label: "Uebersicht", href: "/backoffice" },
+  { id: "contacts", label: "Kontakte", href: "/backoffice/contacts" },
+  { id: "events", label: "Events", href: "/backoffice/events" },
+  { id: "invitations", label: "Einladungen", href: "/backoffice/invitations" },
+  { id: "checkin", label: "Check-in", href: "/backoffice/checkin" },
+] as const;
+
+export type BackofficeSection = (typeof BACKOFFICE_SECTIONS)[number]["id"];
+type UserRole = LoginResponse["user"]["role"];
+type DetectedBarcode = { rawValue?: string };
+type BarcodeDetectorLike = {
+  detect: (source: HTMLVideoElement) => Promise<DetectedBarcode[]>;
+};
+type BarcodeDetectorConstructor = new (options: {
+  formats: string[];
+}) => BarcodeDetectorLike;
 
 type SessionState = LoginResponse | null;
 
@@ -106,6 +133,14 @@ function parseTags(value: string) {
     .filter(Boolean);
 }
 
+function canManagePlanning(role?: UserRole) {
+  return role === "ADMIN" || role === "STAFF";
+}
+
+function canCheckIn(role?: UserRole) {
+  return role === "ADMIN" || role === "STAFF" || role === "CHECK_IN";
+}
+
 async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -128,7 +163,7 @@ async function apiRequest<T>(
   return response.json() as Promise<T>;
 }
 
-export function Dashboard() {
+export function Dashboard({ section = "overview" }: { section?: BackofficeSection }) {
   const [session, setSession] = useState<SessionState>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [events, setEvents] = useState<EventRecord[]>([]);
@@ -148,12 +183,54 @@ export function Dashboard() {
   const [contactError, setContactError] = useState<string | null>(null);
   const [eventError, setEventError] = useState<string | null>(null);
   const [invitationError, setInvitationError] = useState<string | null>(null);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [isScannerActive, setIsScannerActive] = useState(false);
+  const [scannerSupported, setScannerSupported] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isSubmittingContact, startContactTransition] = useTransition();
   const [isImportingContacts, startImportTransition] = useTransition();
   const [isSubmittingEvent, startEventTransition] = useTransition();
   const [isSubmittingInvitations, startInvitationTransition] = useTransition();
   const deferredQuery = useDeferredValue(query);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const qrStreamRef = useRef<MediaStream | null>(null);
+  const qrDetectorRef = useRef<BarcodeDetectorLike | null>(null);
+  const qrFrameRef = useRef<number | null>(null);
+  const qrBusyRef = useRef(false);
+  const currentRole = session?.user.role;
+  const visibleSections = BACKOFFICE_SECTIONS.filter((entry) => {
+    if (entry.id === "overview") {
+      return true;
+    }
+
+    if (entry.id === "checkin") {
+      return canCheckIn(currentRole);
+    }
+
+    return canManagePlanning(currentRole);
+  });
+  const isSectionAllowed =
+    section === "overview" ||
+    (section === "checkin" ? canCheckIn(currentRole) : canManagePlanning(currentRole));
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const BarcodeDetectorApi = (window as Window & {
+      BarcodeDetector?: BarcodeDetectorConstructor;
+    }).BarcodeDetector;
+
+    if (!BarcodeDetectorApi) {
+      return;
+    }
+
+    qrDetectorRef.current = new BarcodeDetectorApi({
+      formats: ["qr_code"],
+    });
+    setScannerSupported(true);
+  }, []);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -176,16 +253,18 @@ export function Dashboard() {
     }
 
     let active = true;
-
-    startTransition(() => {
-      Promise.all([
-        apiRequest<Contact[]>(
+    const planningAccess = canManagePlanning(session.user.role);
+    const eventRequest = apiRequest<EventRecord[]>("/events", {}, session.accessToken);
+    const contactsRequest = planningAccess
+      ? apiRequest<Contact[]>(
           `/contacts${deferredQuery ? `?query=${encodeURIComponent(deferredQuery)}` : ""}`,
           {},
           session.accessToken,
-        ),
-        apiRequest<EventRecord[]>("/events", {}, session.accessToken),
-      ])
+        )
+      : Promise.resolve<Contact[]>([]);
+
+    startTransition(() => {
+      Promise.all([contactsRequest, eventRequest])
         .then(([contactItems, eventItems]) => {
           if (active) {
             setContacts(contactItems);
@@ -238,6 +317,13 @@ export function Dashboard() {
       active = false;
     };
   }, [selectedEventId, session]);
+
+  useEffect(
+    () => () => {
+      stopQrScanner();
+    },
+    [],
+  );
 
   const stats = useMemo(
     () => ({
@@ -617,6 +703,14 @@ export function Dashboard() {
       return;
     }
 
+    submitQrCheckIn(qrToken.trim());
+  }
+
+  function submitQrCheckIn(tokenValue: string) {
+    if (!session?.accessToken || !selectedEventId || !tokenValue) {
+      return;
+    }
+
     setInvitationError(null);
 
     startInvitationTransition(() => {
@@ -625,7 +719,7 @@ export function Dashboard() {
         {
           method: "POST",
           body: JSON.stringify({
-            qrToken: qrToken.trim(),
+            qrToken: tokenValue,
             method: "QR",
             deviceInfo: "web-dashboard-qr",
           }),
@@ -642,6 +736,7 @@ export function Dashboard() {
         .then((items) => {
           setAttendees(items);
           setQrToken("");
+          setScannerError(null);
         })
         .catch((error: Error) => {
           setInvitationError(error.message);
@@ -649,14 +744,131 @@ export function Dashboard() {
     });
   }
 
+  function stopQrScanner() {
+    if (qrFrameRef.current) {
+      window.cancelAnimationFrame(qrFrameRef.current);
+      qrFrameRef.current = null;
+    }
+
+    qrStreamRef.current?.getTracks().forEach((track) => track.stop());
+    qrStreamRef.current = null;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setIsScannerActive(false);
+    qrBusyRef.current = false;
+  }
+
+  function queueScanFrame() {
+    qrFrameRef.current = window.requestAnimationFrame(async () => {
+      const detector = qrDetectorRef.current;
+      const video = videoRef.current;
+
+      if (!detector || !video || video.readyState < 2) {
+        queueScanFrame();
+        return;
+      }
+
+      if (qrBusyRef.current) {
+        queueScanFrame();
+        return;
+      }
+
+      qrBusyRef.current = true;
+
+      try {
+        const [match] = await detector.detect(video);
+
+        if (match?.rawValue) {
+          stopQrScanner();
+          setQrToken(match.rawValue);
+          submitQrCheckIn(match.rawValue);
+          return;
+        }
+      } catch (error) {
+        setScannerError(error instanceof Error ? error.message : "QR-Scan fehlgeschlagen.");
+        stopQrScanner();
+        return;
+      } finally {
+        qrBusyRef.current = false;
+      }
+
+      queueScanFrame();
+    });
+  }
+
+  async function startQrScanner() {
+    if (!scannerSupported) {
+      setScannerError("Dieser Browser unterstuetzt keinen nativen QR-Scan.");
+      return;
+    }
+
+    try {
+      setScannerError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+        },
+      });
+
+      qrStreamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      setIsScannerActive(true);
+      queueScanFrame();
+    } catch (error) {
+      setScannerError(
+        error instanceof Error
+          ? error.message
+          : "Kamera konnte fuer den QR-Scan nicht gestartet werden.",
+      );
+      stopQrScanner();
+    }
+  }
+
+  const activeEvent = events.find((event) => event.id === selectedEventId) ?? null;
+  const selectedContactsCount = selectedContactIds.length;
+  const overviewCards = [
+    {
+      title: "Kontakte",
+      href: "/backoffice/contacts",
+      text: "Kontaktbasis pflegen, durchsuchen und Importe verarbeiten.",
+      chips: [`${stats.total} Kontakte`, `${stats.companies} Firmen`],
+    },
+    {
+      title: "Events",
+      href: "/backoffice/events",
+      text: "Events anlegen, Status steuern und Kapazitaeten pflegen.",
+      chips: [`${eventStats.total} Events`, `${eventStats.published} live`],
+    },
+    {
+      title: "Einladungen",
+      href: "/backoffice/invitations",
+      text: "Gaestelisten zusammenstellen, Versand vorbereiten und Queue anstossen.",
+      chips: [`${invitationStats.total} Einladungen`, `${invitationStats.registered} registriert`],
+    },
+    {
+      title: "Check-in",
+      href: "/backoffice/checkin",
+      text: "Am Eventtag Gaeste manuell oder per QR-Code erfassen.",
+      chips: [`${invitationStats.checkedIn} eingecheckt`, activeEvent ? activeEvent.title : "kein Event gewaehlt"],
+    },
+  ];
+
   return (
     <main className="workspace-shell">
       <section className="workspace-intro">
-        <p className="eyebrow">Backoffice Start</p>
-        <h1>Ein Mitarbeiter-Login und das erste Kontaktmodul sind live.</h1>
+        <p className="eyebrow">Backoffice</p>
+        <h1>Eventplanung, Einladung und Check-in in einem Arbeitsbereich.</h1>
         <p className="lead">
-          Dieses Frontend spricht direkt mit der neuen API. Damit koennen wir
-          ab jetzt UI und Fachlogik parallel weiterentwickeln.
+          Das Backoffice ist jetzt in echte Arbeitsbereiche getrennt. Damit koennen
+          wir Kontakte, Events, Einladungen und Check-in sauber weiter ausbauen.
         </p>
       </section>
 
@@ -716,10 +928,82 @@ export function Dashboard() {
               <p>Rolle: {session.user.role}</p>
             </div>
           ) : null}
+
+          {session ? (
+            <nav className="backoffice-nav" aria-label="Backoffice Navigation">
+              {visibleSections.map((entry) => (
+                <Link
+                  className={`nav-link ${section === entry.id ? "nav-link-active" : ""}`}
+                  href={entry.href}
+                  key={entry.id}
+                >
+                  {entry.label}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
         </aside>
 
         <div className="content-stack">
-          <section className="panel">
+          {section === "overview" ? (
+            <section className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-label">Arbeitsbereiche</p>
+                  <h2>Uebersicht</h2>
+                </div>
+              </div>
+
+              {!session ? (
+                <p className="empty-state">
+                  Melde dich zuerst an. Danach kannst du in die einzelnen Bereiche springen.
+                </p>
+              ) : (
+                <div className="overview-grid">
+                  {overviewCards
+                    .filter((entry) =>
+                      entry.href === "/backoffice/checkin"
+                        ? canCheckIn(currentRole)
+                        : canManagePlanning(currentRole),
+                    )
+                    .map((entry) => (
+                    <article className="overview-card" key={entry.href}>
+                      <p className="section-label">{entry.title}</p>
+                      <p className="overview-copy">{entry.text}</p>
+                      <div className="chip-row">
+                        {entry.chips.map((chip) => (
+                          <span className="stat-chip" key={chip}>
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                      <Link className="ghost-button nav-button" href={entry.href}>
+                        Bereich oeffnen
+                      </Link>
+                    </article>
+                    ))}
+                </div>
+              )}
+            </section>
+          ) : null}
+
+          {section !== "overview" && session && !isSectionAllowed ? (
+            <section className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-label">Zugriff</p>
+                  <h2>Keine Berechtigung</h2>
+                </div>
+              </div>
+              <p className="empty-state">
+                Deine Rolle darf diesen Bereich nicht oeffnen. Nutze die sichtbaren
+                Bereiche in der Navigation.
+              </p>
+            </section>
+          ) : null}
+
+          {section === "contacts" && isSectionAllowed ? (
+            <section className="panel">
             <div className="panel-head">
               <div>
                 <p className="section-label">Kontaktbasis</p>
@@ -891,9 +1175,11 @@ export function Dashboard() {
                 </div>
               </>
             )}
-          </section>
+            </section>
+          ) : null}
 
-          <section className="panel">
+          {section === "events" && isSectionAllowed ? (
+            <section className="panel">
             <div className="panel-head">
               <div>
                 <p className="section-label">Eventplanung</p>
@@ -1089,9 +1375,11 @@ export function Dashboard() {
                 </div>
               </>
             )}
-          </section>
+            </section>
+          ) : null}
 
-          <section className="panel">
+          {section === "invitations" && isSectionAllowed ? (
+            <section className="panel">
             <div className="panel-head">
               <div>
                 <p className="section-label">Einladungsplanung</p>
@@ -1230,14 +1518,116 @@ export function Dashboard() {
                     </div>
 
                     <div className="checkin-panel">
-                      <div className="panel-head">
-                        <div>
-                          <p className="section-label">Eventtag</p>
-                          <h3>Mobiler Check-in</h3>
-                        </div>
-                      </div>
+                      <p className="empty-state">
+                        Der operative Check-in ist jetzt in einen eigenen Bereich verschoben.
+                        Nutze dafuer den Bereich "Check-in".
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty-state">
+                    Waehle ein Event, um Kontakte zuzuordnen und den Versand
+                    einzuplanen.
+                  </p>
+                )}
+              </>
+            )}
+            </section>
+          ) : null}
+
+          {section === "checkin" && isSectionAllowed ? (
+            <section className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-label">Eventtag</p>
+                  <h2>Mobiler Check-in</h2>
+                </div>
+                <div className="chip-row">
+                  <span className="stat-chip">{invitationStats.checkedIn} eingecheckt</span>
+                  <span className="stat-chip">{filteredAttendees.length} Treffer</span>
+                </div>
+              </div>
+
+              {!session ? (
+                <p className="empty-state">
+                  Melde dich zuerst an. Danach kannst du Gaeste manuell oder per QR einchecken.
+                </p>
+              ) : events.length === 0 ? (
+                <p className="empty-state">
+                  Lege zuerst ein Event an. Danach steht die Check-in-Liste bereit.
+                </p>
+              ) : (
+                <>
+                  <label className="field planner-select">
+                    <span>Aktives Event</span>
+                    <select
+                      className="select-input"
+                      onChange={(event) => setSelectedEventId(event.target.value)}
+                      value={selectedEventId}
+                    >
+                      <option value="">Event waehlen</option>
+                      {events.map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {!selectedEventId ? (
+                    <p className="empty-state">
+                      Waehle ein Event, um die Einlassliste zu laden.
+                    </p>
+                  ) : (
+                    <>
+                      {invitationError ? <p className="error-box">{invitationError}</p> : null}
 
                       <div className="qr-checkin-box">
+                        <div className="scanner-toolbar">
+                          <button
+                            className="ghost-button"
+                            disabled={isSubmittingInvitations || !scannerSupported || isScannerActive}
+                            onClick={startQrScanner}
+                            type="button"
+                          >
+                            Kamera-Scan starten
+                          </button>
+                          {isScannerActive ? (
+                            <button
+                              className="ghost-button"
+                              onClick={stopQrScanner}
+                              type="button"
+                            >
+                              Scan stoppen
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {scannerSupported ? (
+                          <div className="scanner-frame">
+                            <video
+                              autoPlay
+                              className="scanner-video"
+                              muted
+                              playsInline
+                              ref={videoRef}
+                            />
+                            {!isScannerActive ? (
+                              <p className="scanner-placeholder">
+                                Kamera aus. Du kannst den Scan starten oder den Token manuell
+                                einfuegen.
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className="empty-state">
+                            Dieser Browser bietet keinen nativen QR-Scan. Nutze in diesem Fall
+                            die manuelle Eingabe.
+                          </p>
+                        )}
+
+                        {scannerError ? <p className="error-box">{scannerError}</p> : null}
+
                         <label className="field field-wide">
                           <span>QR-Token scannen oder einfuegen</span>
                           <input
@@ -1267,9 +1657,7 @@ export function Dashboard() {
 
                       <div className="selection-list">
                         {filteredAttendees.length === 0 ? (
-                          <p className="empty-state">
-                            Keine passenden Teilnehmer gefunden.
-                          </p>
+                          <p className="empty-state">Keine passenden Teilnehmer gefunden.</p>
                         ) : (
                           filteredAttendees.map((invitation) => (
                             <article className="attendee-card" key={`${invitation.id}-checkin`}>
@@ -1312,17 +1700,12 @@ export function Dashboard() {
                           ))
                         )}
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <p className="empty-state">
-                    Waehle ein Event, um Kontakte zuzuordnen und den Versand
-                    einzuplanen.
-                  </p>
-                )}
-              </>
-            )}
-          </section>
+                    </>
+                  )}
+                </>
+              )}
+            </section>
+          ) : null}
         </div>
       </section>
     </main>

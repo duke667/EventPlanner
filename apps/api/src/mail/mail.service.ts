@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import ical, { ICalCalendarMethod } from "ical-generator";
 import nodemailer from "nodemailer";
+import QRCode from "qrcode";
 import { GuestTokenService } from "../guest/guest-token.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -131,6 +132,31 @@ export class MailService {
     return calendar.toString();
   }
 
+  private async createQrAttachment(payload: string) {
+    const dataUrl = await QRCode.toDataURL(payload, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 280,
+    });
+
+    return {
+      cid: "checkin-qr@eventmanager",
+      filename: "checkin-qr.png",
+      content: this.dataUrlToBuffer(dataUrl),
+      contentType: "image/png",
+    };
+  }
+
+  private dataUrlToBuffer(dataUrl: string) {
+    const [, base64] = dataUrl.split(",");
+
+    if (!base64) {
+      throw new Error("Invalid QR code payload");
+    }
+
+    return Buffer.from(base64, "base64");
+  }
+
   private async sendInvitationMail(
     transporter: nodemailer.Transporter,
     job: EmailJobWithRelations,
@@ -142,7 +168,7 @@ export class MailService {
       invitation.id,
     );
     const guestUrl = `${this.configService.get<string>("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/guest/${token}`;
-    const qrPayload = `${this.configService.get<string>("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/checkin/${checkInToken}`;
+    const qrAttachment = await this.createQrAttachment(checkInToken);
 
     return transporter.sendMail({
       from: this.configService.get<string>("MAIL_FROM") ?? "events@example.com",
@@ -156,15 +182,19 @@ export class MailService {
         `Start: ${invitation.event.startsAt.toISOString()}`,
         "",
         `Bitte antworte hier: ${guestUrl}`,
-        `QR Check-in: ${qrPayload}`,
+        "Am Eventtag kannst du den beigefuegten QR-Code vorzeigen.",
+        `Fallback-Code fuer den Check-in: ${checkInToken}`,
       ].join("\n"),
       html: [
         `<p>Hallo ${invitation.contact.firstName} ${invitation.contact.lastName},</p>`,
         `<p>du bist zum Event <strong>${invitation.event.title}</strong> eingeladen.</p>`,
         `<p><strong>Ort:</strong> ${invitation.event.locationName}<br /><strong>Start:</strong> ${invitation.event.startsAt.toISOString()}</p>`,
         `<p><a href="${guestUrl}">Zur Anmeldung</a></p>`,
-        `<p><strong>QR-Check-in:</strong><br /><code>${checkInToken}</code></p>`,
+        `<p><strong>QR-Check-in:</strong><br />Bitte diesen Code am Einlass vorzeigen.</p>`,
+        '<p><img src="cid:checkin-qr@eventmanager" alt="QR-Code fuer den Check-in" width="180" height="180" /></p>',
+        `<p><strong>Fallback-Code:</strong><br /><code>${checkInToken}</code></p>`,
       ].join(""),
+      attachments: [qrAttachment],
     });
   }
 

@@ -72,6 +72,62 @@ h1 {
   gap: 22px;
 }
 
+.backoffice-nav {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 16px;
+  text-decoration: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(50, 35, 23, 0.08);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.nav-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(155, 77, 39, 0.24);
+}
+
+.nav-link-active {
+  background: linear-gradient(135deg, rgba(155, 77, 39, 0.18), rgba(255, 255, 255, 0.78));
+  border-color: rgba(155, 77, 39, 0.28);
+  color: var(--accent-strong);
+}
+
+.nav-button {
+  text-decoration: none;
+  justify-content: center;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.overview-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid rgba(50, 35, 23, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 22px;
+  padding: 20px;
+}
+
+.overview-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .planner-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -328,6 +384,42 @@ h1 {
   margin-bottom: 18px;
 }
 
+.scanner-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scanner-frame {
+  position: relative;
+  min-height: 220px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(50, 35, 23, 0.08);
+  background:
+    linear-gradient(180deg, rgba(32, 26, 19, 0.05), rgba(32, 26, 19, 0.18)),
+    rgba(255, 255, 255, 0.62);
+}
+
+.scanner-video {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  object-fit: cover;
+}
+
+.scanner-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(251, 247, 241, 0.88);
+}
+
 .selection-list {
   display: grid;
   gap: 10px;
@@ -493,6 +585,7 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .overview-grid,
   .planner-grid {
     grid-template-columns: 1fr;
   }
