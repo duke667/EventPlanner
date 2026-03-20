@@ -41,6 +41,9 @@ export class GuestService {
   async respond(token: string, dto: RespondInvitationDto) {
     const invitation = await this.findInvitationByToken(token);
     const response = dto.response as RegistrationResponse;
+    const wasAccepted =
+      invitation.registration?.response === RegistrationResponse.ACCEPTED &&
+      invitation.status === InvitationStatus.REGISTERED;
 
     const registration = await this.prisma.eventRegistration.upsert({
       where: {
@@ -75,7 +78,11 @@ export class GuestService {
       },
     });
 
-    if (response === RegistrationResponse.ACCEPTED) {
+    if (
+      response === RegistrationResponse.ACCEPTED &&
+      !wasAccepted &&
+      (await this.shouldQueueConfirmation(invitation.id))
+    ) {
       await this.prisma.emailJob.create({
         data: {
           eventId: invitation.eventId,
@@ -100,6 +107,23 @@ export class GuestService {
   async createGuestLink(invitationId: string) {
     const token = this.guestTokenService.createInvitationToken(invitationId);
     return `${token}`;
+  }
+
+  private async shouldQueueConfirmation(invitationId: string) {
+    const existingConfirmationJob = await this.prisma.emailJob.findFirst({
+      where: {
+        eventInvitationId: invitationId,
+        templateType: "CONFIRMATION",
+        status: {
+          in: ["QUEUED", "SENT"],
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return !existingConfirmationJob;
   }
 
   private async findInvitationByToken(token: string) {
