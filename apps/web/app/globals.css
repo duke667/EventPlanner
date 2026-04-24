@@ -29,9 +29,9 @@ body {
 }
 
 .workspace-shell {
-  max-width: 1120px;
+  max-width: min(1680px, 100%);
   margin: 0 auto;
-  padding: 72px 24px 96px;
+  padding: 56px clamp(18px, 3vw, 40px) 96px;
 }
 
 .workspace-intro {
@@ -62,7 +62,7 @@ h1 {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: 22px;
   margin-top: 40px;
 }
@@ -147,7 +147,7 @@ h1 {
 }
 
 .planner-select {
-  max-width: 360px;
+  max-width: 520px;
 }
 
 .panel {
@@ -380,6 +380,68 @@ h1 {
   background: rgba(255, 255, 255, 0.62);
   border-radius: 22px;
   padding: 16px;
+}
+
+.manual-selection-panel {
+  margin-top: 18px;
+  border: 1px solid rgba(50, 35, 23, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+  border-radius: 22px;
+  padding: 16px;
+}
+
+.manual-selection-panel summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.compact-selection-list {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.compact-selector-row {
+  padding: 10px 12px;
+}
+
+.compact-selector-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invitation-list-panel {
+  margin-top: 18px;
+}
+
+.invitation-list-panel h3 {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+}
+
+.invitation-table {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.invitation-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.8fr) minmax(70px, 0.4fr) minmax(180px, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid rgba(50, 35, 23, 0.06);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.invitation-row span {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .checkin-panel {
@@ -761,6 +823,10 @@ h1 {
     flex-direction: column;
   }
 
+  .invitation-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .guest-form {
     grid-template-columns: 1fr;
   }
@@ -777,6 +843,11 @@ h1 {
 
   .event-form {
     grid-template-columns: 1fr;
+  }
+
+  .invitation-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .contact-card-head,

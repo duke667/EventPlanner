@@ -1989,68 +1989,64 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                       </div>
                     </div>
 
-                    <div className="planner-grid">
-                      <div className="selection-panel">
-                        <p className="section-label">Kontakte auswaehlen</p>
-                        <div className="selection-list">
-                          {contacts.map((contact) => (
-                            <label className="selector-row" key={contact.id}>
-                              <input
-                                checked={selectedContactIds.includes(contact.id)}
-                                onChange={() => toggleSelectedContact(contact.id)}
-                                type="checkbox"
-                              />
-                              <span>
-                                <strong>
-                                  {contact.firstName} {contact.lastName}
-                                </strong>
-                                <small>
-                                  {contact.company ?? "Ohne Firma"} · {contact.email}
-                                </small>
-                              </span>
-                            </label>
-                          ))}
+                    <details className="manual-selection-panel" open={attendees.length === 0}>
+                      <summary>
+                        Kontakte manuell hinzufuegen
+                        {selectedContactIds.length > 0 ? ` (${selectedContactIds.length})` : ""}
+                      </summary>
+                      <p className="template-help">
+                        Nur erforderlich, wenn du einzelne Kontakte ohne Gaestelistenimport
+                        ergaenzen willst.
+                      </p>
+                      <div className="selection-list compact-selection-list">
+                        {contacts.map((contact) => (
+                          <label className="selector-row compact-selector-row" key={contact.id}>
+                            <input
+                              checked={selectedContactIds.includes(contact.id)}
+                              onChange={() => toggleSelectedContact(contact.id)}
+                              type="checkbox"
+                            />
+                            <span>
+                              <strong>
+                                {contact.firstName} {contact.lastName}
+                              </strong>
+                              <small>{contact.email}</small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+
+                    <div className="selection-panel invitation-list-panel">
+                      <div className="panel-head compact-head">
+                        <div>
+                          <p className="section-label">Aktuelle Einladungsliste</p>
+                          <h3>{attendees.length} Gaeste</h3>
                         </div>
                       </div>
-
-                      <div className="selection-panel">
-                        <p className="section-label">Aktuelle Einladungsliste</p>
-                        <div className="selection-list">
-                          {attendees.length === 0 ? (
-                            <p className="empty-state">
-                              Fuer dieses Event gibt es noch keine Einladungen.
-                            </p>
-                          ) : (
-                            attendees.map((invitation) => (
-                              <article className="attendee-card" key={invitation.id}>
-                                <div className="attendee-head">
-                                  <div>
-                                    <strong>
-                                      {invitation.contact.firstName} {invitation.contact.lastName}
-                                    </strong>
-                                    <small>{invitation.contact.email}</small>
-                                  </div>
-                                  <span className="tag">
-                                    {formatInvitationStatus(invitation.status)}
-                                  </span>
-                                </div>
-                                <p className="attendee-meta">
-                                  {invitation.contact.company ?? "Ohne Firma"}
-                                </p>
-                                <p className="attendee-meta">
-                                  Jobs: {invitation.emailJobs.length}
-                                  {invitation.registration
-                                    ? ` · Antwort ${invitation.registration.response}${
-                                      invitation.registration.companionRequested
-                                          ? ` · Begleitung: ${invitation.registration.companionFirstName ?? ""} ${invitation.registration.companionLastName ?? ""}`
-                                          : ""
-                                      }`
-                                    : ""}
-                                </p>
-                              </article>
-                            ))
-                          )}
-                        </div>
+                      <div className="invitation-table">
+                        {attendees.length === 0 ? (
+                          <p className="empty-state">
+                            Fuer dieses Event gibt es noch keine Einladungen.
+                          </p>
+                        ) : (
+                          attendees.map((invitation) => (
+                            <article className="invitation-row" key={invitation.id}>
+                              <strong>
+                                {invitation.contact.firstName} {invitation.contact.lastName}
+                              </strong>
+                              <span>{formatInvitationStatus(invitation.status)}</span>
+                              <span>{invitation.registration?.guestCount ?? 1} Pers.</span>
+                              <span>
+                                {invitation.registration?.companionRequested
+                                  ? `${invitation.registration.companionFirstName ?? ""} ${
+                                      invitation.registration.companionLastName ?? ""
+                                    }`
+                                  : ""}
+                              </span>
+                            </article>
+                          ))
+                        )}
                       </div>
                     </div>
 
