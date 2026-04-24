@@ -5,8 +5,11 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { AuthenticatedUser, JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Roles } from "../auth/roles.decorator";
@@ -53,6 +56,17 @@ export class EventsController {
     return this.eventsService.createInvitations(id, dto);
   }
 
+  @Post(":id/import-guests")
+  @UseInterceptors(FileInterceptor("file"))
+  @Roles("ADMIN", "STAFF")
+  importGuests(
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.eventsService.importGuests(id, file, user.sub);
+  }
+
   @Post(":id/send-invitations")
   @Roles("ADMIN", "STAFF")
   sendInvitations(@Param("id") id: string, @Body() dto: SendInvitationsDto) {
@@ -67,5 +81,11 @@ export class EventsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.eventsService.checkIn(id, dto, user.sub);
+  }
+
+  @Post(":id/check-in/preview")
+  @Roles("ADMIN", "STAFF", "CHECK_IN")
+  previewCheckIn(@Param("id") id: string, @Body() dto: CheckInDto) {
+    return this.eventsService.previewCheckIn(id, dto);
   }
 }

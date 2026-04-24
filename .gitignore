@@ -8,6 +8,7 @@ coverage
 .env.local
 .env.*.local
 *.log
+*.tsbuildinfo
 
 # Prisma
 apps/api/prisma/dev.db
@@ -16,3 +17,7 @@ apps/api/prisma/dev.db-journal
 # Uploads
 storage
 
+# Local/private data
+data/
+.codex
+.codex/

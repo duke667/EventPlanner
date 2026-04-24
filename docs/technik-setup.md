@@ -10,10 +10,10 @@ Empfehlung fuer den Start:
 - Backend: NestJS
 - Datenbank: PostgreSQL
 - ORM: Prisma
-- Hintergrundjobs: BullMQ mit Redis
+- Hintergrundjobs: aktuell einfache Datenbank-Mailqueue; spaeter BullMQ mit Redis
 - Dateispeicher: lokal in Dev, S3-kompatibel in Produktion
 - Mailversand: Postmark, Mailgun oder SendGrid
-- Authentifizierung: Mitarbeiter via Session oder JWT mit HttpOnly Cookies
+- Authentifizierung: aktuell JWT Bearer Token; spaeter HttpOnly Cookies pruefen
 - Deployment: Docker-Container
 
 Warum dieses Setup:
@@ -30,17 +30,17 @@ Warum dieses Setup:
 
 - `Next.js` mit App Router
 - `TypeScript`
-- `Tailwind CSS` fuer schnelle, konsistente UI
-- `shadcn/ui` oder aehnliche Basiskomponenten fuer Backoffice
-- `React Hook Form` + `Zod` fuer Formulare und Validierung
-- QR-Scanner im Browser spaeter z. B. ueber `@zxing/browser`
+- CSS im App Router ueber `globals.css`
+- Backoffice, Gastseiten und mobile Check-in-Ansichten in einer Next.js-App
+- QR-Scanner im Browser aktuell ueber native `BarcodeDetector` API mit manueller Token-Fallback-Eingabe
 
 ### Backend
 
 - `NestJS`
 - `Prisma`
 - `Zod` oder `class-validator` fuer API-Validierung
-- `BullMQ` fuer Mailjobs, Importjobs und spaetere Reminder
+- Datenbankbasierte Mailjobs fuer Einladungen und Bestaetigungen
+- `BullMQ` bleibt Option fuer spaetere Reminder und robuste Worker-Skalierung
 - `nodemailer` nur fuer lokale Entwicklung; in Produktion API-basierter Mailprovider
 - `ical-generator` oder aehnliche Library fuer ICS-Dateien
 - `xlsx` fuer Excel-Import
@@ -150,6 +150,8 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `created_at`
 - `updated_at`
 
+Hinweis aktueller Stand: Die Option `allowCompanion` wird migrationsfrei als interne Metadatenzeile in `description` gespeichert und bei API-Ausgaben wieder entfernt. Das ist fuer das Testsystem pragmatisch, sollte vor produktiver Stabilisierung in eine eigene Spalte migriert werden.
+
 ### `event_invitations`
 
 - `id`
@@ -175,6 +177,8 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `registered_at`
 - `cancelled_at`
 
+Hinweis aktueller Stand: Begleitpersonen werden migrationsfrei in `guest_count` und codierten Metadaten in `dietary_requirements` abgebildet. Fuer die Produktion sollte daraus ein explizites Schema werden, z. B. `companion_first_name`, `companion_last_name` und `companion_checked_in`.
+
 ### `check_ins`
 
 - `id`
@@ -183,6 +187,8 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `checked_in_at`
 - `checked_in_by_user_id`
 - `device_info`
+
+Hinweis aktueller Stand: Ob eine angemeldete Begleitung beim Check-in tatsaechlich dabei war, wird migrationsfrei als interne Metadaten in `device_info` gespeichert und in API-Antworten als `companionPresent` aufbereitet.
 
 ### `email_jobs`
 
@@ -210,8 +216,10 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `GET /events/:id`
 - `PATCH /events/:id`
 - `POST /events/:id/invitations`
+- `POST /events/:id/import-guests`
 - `POST /events/:id/send-invitations`
 - `GET /events/:id/attendees`
+- `POST /events/:id/check-in/preview`
 - `POST /events/:id/check-in`
 
 ### Gastbereich
@@ -225,17 +233,18 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 ### Kontaktimport
 
 1. Datei-Upload in Web-App.
-2. Datei wird temporar gespeichert.
-3. Backend analysiert Header und bietet Feld-Mapping an.
-4. Nach Freigabe startet ein Importjob.
-5. Job validiert Datensaetze, schreibt Kontakte und protokolliert Fehler.
+2. Backend liest CSV oder XLSX direkt aus dem Upload-Buffer.
+3. Import validiert Datensaetze, schreibt Kontakte und protokolliert Fehler.
+4. Beim eventbezogenen Gaestelistenimport werden Kontakte direkt dem Event als Einladungen zugeordnet.
+5. Stadtgeburtstag-spezifische Spalten werden auf Kontaktfelder und Serienbrief-Metadaten gemappt.
 
 ### Einladungsmail
 
 1. Mitarbeiter startet Versand.
-2. Backend erzeugt pro Einladung einen Mailjob.
-3. Worker rendert E-Mail-Template und verschickt ueber Provider.
-4. Versandstatus wird gespeichert.
+2. Mitarbeiter kann Betreff und Text mit Platzhaltern erfassen.
+3. Backend erzeugt pro Einladung einen Mailjob.
+4. Worker rendert E-Mail-Template mit Kontakt-, Event- und Importfeldern und verschickt ueber SMTP/Provider.
+5. Versandstatus wird gespeichert.
 
 ### Registrierung
 
@@ -243,14 +252,24 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 2. Token wird geprueft.
 3. Formular wird angezeigt.
 4. Antwort wird gespeichert.
-5. Bestaetigungsmail mit ICS wird als Job versendet.
+5. Falls das Event Begleitung erlaubt, kann der Gast eine Begleitperson angeben.
+6. Bestaetigungsmail mit ICS wird als Job versendet.
 
 ### Check-in
 
 1. Mitarbeiter oeffnet mobile Liste oder Scanneransicht.
 2. Suche oder QR-Code identifiziert Einladung.
-3. Backend validiert Event und Status.
-4. Check-in wird geschrieben und UI aktualisiert.
+3. Bei QR-Scan liefert `/events/:id/check-in/preview` zunaechst die Gastdaten inklusive Begleitstatus.
+4. Mitarbeiter bestaetigt den Check-in und ggf. die Anwesenheit der Begleitung.
+5. Backend validiert Event und Status.
+6. Check-in wird geschrieben und UI aktualisiert.
+
+### Live-Dashboard
+
+1. Backoffice laedt `/events/:id/attendees`.
+2. Frontend berechnet daraus Live-Kennzahlen pro Event.
+3. Kennzahlen umfassen Einladungen, Zusagen, Absagen, offene Antworten, erwartete Personen, Personen vor Ort, Begleitungen, Einlassquote und Kapazitaetsauslastung.
+4. Listen fuer noch nicht eingecheckte Zusagen und letzte Check-ins werden clientseitig aus derselben Datenbasis berechnet.
 
 ## 7. Lokales Entwicklungs-Setup
 

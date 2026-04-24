@@ -73,12 +73,15 @@ Nach dem Start pruefen:
 Dann mit dem Seed-Admin anmelden und einen kurzen Smoke-Test fahren:
 
 1. Login im Backoffice
-2. Kontakt importieren oder manuell anlegen
-3. Event anlegen
-4. Einladung erzeugen und Versand anstossen
-5. Gastlink aus Mailpit testen
-6. Zusage und ICS pruefen
-7. Check-in manuell und per QR pruefen
+2. Event anlegen und entscheiden, ob Begleitung erlaubt ist
+3. Kontakt importieren/manuell anlegen oder im Bereich Einladungen eine Gaesteliste direkt fuer das Event importieren
+4. Einladungstext mit Serienbrief-Platzhaltern pruefen, z. B. `{{contact.personalSalutation}}`, `{{event.title}}`, `{{custom.amt}}`, `{{invitationUrl}}`
+5. Einladung erzeugen bzw. importierte Gaesteliste pruefen und Versand anstossen
+6. Mail in Mailpit oeffnen und Gastlink testen
+7. Zusage ohne Begleitung und, falls erlaubt, Zusage mit Begleitperson testen
+8. Bestaetigung und ICS pruefen
+9. QR-Check-in pruefen: erst Vorschau, dann Check-in bestaetigen und ggf. "Begleitung ist dabei" setzen
+10. Live-Dashboard pruefen: eingeladene, zugesagte, offene, abgesagte und eingecheckte Gaeste sowie Personen vor Ort inklusive Begleitungen
 
 ## Reverse Proxy
 
@@ -122,6 +125,14 @@ git pull
 docker-compose -f docker-compose.testsystem.yml --env-file .env.test up -d --build
 ```
 
+Nach dem Deploy fuer diesen Stand besonders pruefen:
+
+- `/backoffice/live` ist erreichbar und in der Navigation sichtbar.
+- Eventbeschreibung wird normal angezeigt und enthaelt keine internen Metadaten.
+- Gaeste koennen Begleitpersonen nur anmelden, wenn das Event diese Option erlaubt.
+- QR-Check-in zeigt vor dem finalen Check-in eine Vorschau.
+- Personenzaehlung im Live-Dashboard beruecksichtigt bestaetigte Begleitungen.
+
 Falls sich das Admin-Passwort aendert:
 
 ```bash
@@ -137,3 +148,4 @@ Vor dem produktiven Einsatz fehlen weiterhin:
 - automatisierte Tests und CI
 - Monitoring/Backups
 - echte Mail-Infrastruktur statt Mailpit
+- produktionsreife Datenbankspalten fuer Begleitpersonen und Event-Optionen statt der aktuellen migrationsfreien Metadatenablage

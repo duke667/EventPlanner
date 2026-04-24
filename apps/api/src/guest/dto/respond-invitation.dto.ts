@@ -1,4 +1,13 @@
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from "class-validator";
 
 export class RespondInvitationDto {
   @IsIn(["ACCEPTED", "DECLINED"])
@@ -18,4 +27,18 @@ export class RespondInvitationDto {
   @IsString()
   @MaxLength(500)
   dietaryRequirements?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  companionRequested?: boolean;
+
+  @ValidateIf((dto: RespondInvitationDto) => dto.companionRequested === true)
+  @IsString()
+  @MaxLength(120)
+  companionFirstName?: string;
+
+  @ValidateIf((dto: RespondInvitationDto) => dto.companionRequested === true)
+  @IsString()
+  @MaxLength(120)
+  companionLastName?: string;
 }

@@ -20,14 +20,16 @@ Der erste sinnvolle MVP sollte folgende Faehigkeiten enthalten:
 - Kontaktverwaltung
 - Kontaktimport per Excel oder CSV
 - Eventverwaltung
+- optionale Begleitperson pro Event
 - Einladungslisten pro Event
-- Versand von Einladungsmails
+- Versand von personalisierten Einladungsmails mit Serienbrief-Platzhaltern
 - Gastregistrierung ueber personalisierten Link
 - Versand von Bestaetigungsmails mit ICS-Datei
 - Teilnehmerstatus pro Event
+- Live-Dashboard fuer Veranstaltungsmanager
 - Mobile Check-in-Oberflaeche
 - manueller Check-in
-- optionaler QR-Code-Check-in
+- QR-Code-Check-in mit Vorschau und Begleitpersonen-Bestaetigung
 
 Nicht im ersten MVP:
 
@@ -44,15 +46,20 @@ Nicht im ersten MVP:
 
 - Kontakte anlegen, bearbeiten, importieren
 - Events erstellen und bearbeiten
+- pro Event festlegen, ob eine Begleitung erlaubt ist
 - Einladungslisten zusammenstellen
+- Gaestelisten direkt fuer ein Event importieren
+- Einladungstexte mit Platzhaltern vorbereiten
 - E-Mails versenden
 - Anmeldestatus einsehen
+- Live-Kennzahlen der Veranstaltung einsehen
 - Check-in am Eventtag durchfuehren
 
 ### Gast
 
 - Einladung per E-Mail erhalten
 - ueber Link registrieren oder absagen
+- falls erlaubt, eine Begleitperson mit Vor- und Nachname anmelden
 - Bestaetigungsmail mit Eventdetails erhalten
 - optional QR-Code am Eventtag vorzeigen
 
@@ -87,6 +94,14 @@ Wichtige Kontaktfelder:
 - Notizen
 - Einwilligungs- oder Kommunikationsstatus
 
+Aktueller Importstand:
+
+- Allgemeiner Kontaktimport unterstuetzt CSV und XLSX.
+- Fuer eine Veranstaltung kann eine Gaesteliste direkt im Einladungsbereich importiert werden.
+- Die Stadtgeburtstag-Teststruktur wird aktuell ueber Spalten wie `Anrede`, `PersAnrede`, `Name`, `Vorname`, `PLZ`, `Ort`, `Straße`, `Amt`, `Position`, `Firma`, `Mail-Dienstl1`, `Mail-Privat`, `Telefon` und DSGVO-Felder verarbeitet.
+- Dienstliche E-Mail wird bevorzugt, private E-Mail dient als Fallback.
+- Spezielle Importfelder stehen fuer Serienbrief-Platzhalter zur Verfuegung, z. B. `{{custom.amt}}`, `{{custom.position}}`, `{{custom.zusatz}}` oder `{{excel.Anrede}}`.
+
 ### 4.2 Event anlegen
 
 Ein Event benoetigt mindestens:
@@ -100,12 +115,15 @@ Ein Event benoetigt mindestens:
 - maximale Teilnehmerzahl optional
 - Ansprechpartner
 - Status `draft`, `published`, `closed`, `archived`
+- Option, ob die Einladung nur persoenlich gilt oder ob eine Begleitung erlaubt ist
 
 ### 4.3 Einladungsliste erzeugen
 
 - Mitarbeiter waehlt Kontakte fuer ein Event aus.
+- Alternativ importiert er eine Gaesteliste direkt fuer das Event.
 - System erzeugt pro Kontakt eine Event-Einladung.
 - Jede Einladung bekommt einen eindeutigen Token fuer Antwort- und Check-in-Prozesse.
+- Fuer importierte Gaestelisten werden Kontakte per E-Mail-Adresse angelegt oder aktualisiert und direkt dem Event zugeordnet.
 
 Statusmodell einer Einladung:
 
@@ -121,10 +139,12 @@ Statusmodell einer Einladung:
 
 ### 4.4 Einladung und Anmeldung
 
-- Gast erhaelt E-Mail mit persoenlichem Link.
+- Mitarbeiter erstellt einen Einladungstext mit Serienbrief-Platzhaltern.
+- Gast erhaelt E-Mail mit persoenlichem Link und individualisiertem Text.
 - Gast landet auf einer schlanken Registrierungsseite.
 - Gast bestaetigt Teilnahme oder sagt ab.
-- Optional koennen Zusatzdaten abgefragt werden, z. B. Essenswuensche oder Begleitperson.
+- Wenn das Event Begleitung erlaubt, kann der Gast eine Begleitperson mit Vor- und Nachname angeben.
+- Fuer Begleitungen wird im aktuellen Stand keine separate Einladung erzeugt.
 - Nach erfolgreicher Anmeldung wird der Teilnehmerstatus aktualisiert.
 
 ### 4.5 Bestaetigung und Kalendereintrag
@@ -138,8 +158,18 @@ Statusmodell einer Einladung:
 - Mitarbeiter oeffnet auf Smartphone oder Tablet die Check-in-Ansicht.
 - Suche nach Name, Firma oder E-Mail muss schnell funktionieren.
 - Gast kann manuell als anwesend markiert werden.
-- Optional kann ein QR-Code gescannt werden.
+- Ein QR-Code kann gescannt werden.
+- Nach dem Scan zeigt das System eine Vorschau des Gasts.
+- Wenn eine Begleitung angemeldet ist, bestaetigt der Check-in-Mitarbeiter per Haken, ob diese Begleitung tatsaechlich dabei ist.
+- Die Veranstaltungsauswertung zaehlt eingecheckte Personen inklusive bestaetigter Begleitungen.
 - Nicht eingeladene Personen koennen als Walk-in dokumentiert werden, wenn gewuenscht.
+
+### 4.7 Live-Dashboard
+
+- Veranstaltungsmanager waehlen ein Event und sehen den aktuellen Veranstaltungsstand.
+- Sichtbar sind eingeladene, zugesagte, offene, abgesagte und eingecheckte Gaeste.
+- Zusaetzlich werden erwartete Personen, Personen vor Ort, Begleitungen, Einlassquote und Kapazitaetsauslastung berechnet.
+- Listen zeigen zugesagte Gaeste, die noch nicht eingecheckt sind, sowie die zuletzt eingecheckten Personen.
 
 ## 5. Fachliches Datenmodell
 
@@ -180,11 +210,13 @@ Statusmodell einer Einladung:
 - Einladungen gesammelt erzeugen
 - Mailversand starten
 - Teilnehmerstatus live einsehen
+- Live-Dashboard pro Veranstaltung
 - Check-in-Liste auf Mobilgeraeten bedienen
 
 ### Gastbereich
 
 - personalisierte Registrierungsseite
+- Begleitpersonen-Angabe, falls im Event erlaubt
 - sichere Token-Links ohne Login
 - responsive Darstellung
 - klare Erfolgs- und Fehlermeldungen

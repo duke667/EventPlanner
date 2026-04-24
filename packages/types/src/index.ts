@@ -31,6 +31,7 @@ export interface EventRecord {
   timezone: string;
   capacity: number | null;
   status: "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED";
+  allowCompanion?: boolean;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +62,10 @@ export interface EventInvitationRecord {
   registration: {
     id: string;
     response: "ACCEPTED" | "DECLINED";
+    guestCount?: number;
+    companionRequested?: boolean;
+    companionFirstName?: string | null;
+    companionLastName?: string | null;
     registeredAt: string;
   } | null;
   checkIns?: Array<{
@@ -68,6 +73,7 @@ export interface EventInvitationRecord {
     method: "MANUAL" | "QR";
     checkedInAt: string;
     checkedInByUserId: string | null;
+    companionPresent?: boolean;
   }>;
   emailJobs: Array<{
     id: string;
@@ -119,6 +125,10 @@ export interface ContactImportResult {
   importedRows: number;
   errorRows: number;
   duplicates: number;
+  createdContacts?: number;
+  updatedContacts?: number;
+  createdInvitations?: number;
+  skippedInvitations?: number;
   createdAt: string;
   errors: Array<{
     row: number;

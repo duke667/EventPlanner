@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -52,4 +53,8 @@ export class UpdateEventDto {
   @IsOptional()
   @IsIn(eventStatuses)
   status?: (typeof eventStatuses)[number];
+
+  @IsOptional()
+  @IsBoolean()
+  allowCompanion?: boolean;
 }

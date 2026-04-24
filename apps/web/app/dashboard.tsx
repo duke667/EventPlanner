@@ -26,6 +26,7 @@ const BACKOFFICE_SECTIONS = [
   { id: "contacts", label: "Kontakte", href: "/backoffice/contacts" },
   { id: "events", label: "Events", href: "/backoffice/events" },
   { id: "invitations", label: "Einladungen", href: "/backoffice/invitations" },
+  { id: "live", label: "Live-Dashboard", href: "/backoffice/live" },
   { id: "checkin", label: "Check-in", href: "/backoffice/checkin" },
 ] as const;
 
@@ -59,6 +60,12 @@ type EventFormState = {
   timezone: string;
   capacity: string;
   status: "DRAFT" | "PUBLISHED";
+  allowCompanion: boolean;
+};
+
+type InvitationTemplateState = {
+  subject: string;
+  body: string;
 };
 
 const initialContactForm: ContactFormState = {
@@ -79,7 +86,38 @@ const initialEventForm: EventFormState = {
   timezone: "Europe/Berlin",
   capacity: "",
   status: "DRAFT",
+  allowCompanion: false,
 };
+
+const initialInvitationTemplate: InvitationTemplateState = {
+  subject: "Einladung: {{event.title}}",
+  body: [
+    "{{contact.personalSalutation}}",
+    "",
+    "wir laden Sie herzlich zu {{event.title}} ein.",
+    "",
+    "Ort: {{event.locationName}}",
+    "Beginn: {{event.startsAt}}",
+    "",
+    "Bitte geben Sie uns ueber folgenden Link Rueckmeldung:",
+    "{{invitationUrl}}",
+  ].join("\n"),
+};
+
+const TEMPLATE_FIELDS = [
+  { token: "contact.personalSalutation", label: "Pers. Anrede" },
+  { token: "contact.salutation", label: "Anrede" },
+  { token: "contact.firstName", label: "Vorname" },
+  { token: "contact.lastName", label: "Nachname" },
+  { token: "contact.company", label: "Firma" },
+  { token: "contact.jobTitle", label: "Position" },
+  { token: "custom.amt", label: "Amt" },
+  { token: "custom.zusatz", label: "Zusatz" },
+  { token: "event.title", label: "Event" },
+  { token: "event.startsAt", label: "Start" },
+  { token: "event.locationName", label: "Ort" },
+  { token: "invitationUrl", label: "Antwortlink" },
+] as const;
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("de-DE", {
@@ -173,12 +211,17 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [query, setQuery] = useState("");
   const [checkInQuery, setCheckInQuery] = useState("");
   const [qrToken, setQrToken] = useState("");
+  const [checkInPreview, setCheckInPreview] = useState<EventInvitationRecord | null>(null);
+  const [companionPresent, setCompanionPresent] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [contactForm, setContactForm] =
     useState<ContactFormState>(initialContactForm);
   const [importResult, setImportResult] = useState<ContactImportResult | null>(null);
   const [eventForm, setEventForm] = useState<EventFormState>(initialEventForm);
+  const [invitationTemplate, setInvitationTemplate] = useState<InvitationTemplateState>(
+    initialInvitationTemplate,
+  );
   const [authError, setAuthError] = useState<string | null>(null);
   const [contactError, setContactError] = useState<string | null>(null);
   const [eventError, setEventError] = useState<string | null>(null);
@@ -189,6 +232,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [isPending, startTransition] = useTransition();
   const [isSubmittingContact, startContactTransition] = useTransition();
   const [isImportingContacts, startImportTransition] = useTransition();
+  const [isImportingGuests, startGuestImportTransition] = useTransition();
   const [isSubmittingEvent, startEventTransition] = useTransition();
   const [isSubmittingInvitations, startInvitationTransition] = useTransition();
   const deferredQuery = useDeferredValue(query);
@@ -325,6 +369,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     [],
   );
 
+  const activeEvent = events.find((event) => event.id === selectedEventId) ?? null;
+
   const stats = useMemo(
     () => ({
       total: contacts.length,
@@ -350,9 +396,71 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       queued: attendees.filter((invitation) => invitation.status === "SCHEDULED").length,
       registered: attendees.filter((invitation) => invitation.status === "REGISTERED").length,
       checkedIn: attendees.filter((invitation) => invitation.status === "CHECKED_IN").length,
+      checkedInPersons: attendees.reduce((total, invitation) => {
+        if (invitation.status !== "CHECKED_IN") {
+          return total;
+        }
+
+        const companionCheckedIn = invitation.checkIns?.[0]?.companionPresent === true;
+        return total + 1 + (companionCheckedIn ? 1 : 0);
+      }, 0),
     }),
     [attendees],
   );
+
+  const liveStats = useMemo(() => {
+    const accepted = attendees.filter((invitation) =>
+      ["REGISTERED", "CHECKED_IN"].includes(invitation.status),
+    );
+    const declined = attendees.filter((invitation) => invitation.status === "DECLINED");
+    const checkedIn = attendees.filter((invitation) => invitation.status === "CHECKED_IN");
+    const open = attendees.filter((invitation) =>
+      ["DRAFT", "SCHEDULED", "SENT"].includes(invitation.status),
+    );
+    const expectedPersons = accepted.reduce(
+      (total, invitation) => total + (invitation.registration?.guestCount ?? 1),
+      0,
+    );
+    const checkedInPersons = checkedIn.reduce((total, invitation) => {
+      const companionCheckedIn = invitation.checkIns?.[0]?.companionPresent === true;
+      return total + 1 + (companionCheckedIn ? 1 : 0);
+    }, 0);
+    const companionExpected = accepted.filter(
+      (invitation) => invitation.registration?.companionRequested,
+    ).length;
+    const companionCheckedIn = checkedIn.filter(
+      (invitation) => invitation.checkIns?.[0]?.companionPresent,
+    ).length;
+    const noShows = accepted.filter((invitation) => invitation.status !== "CHECKED_IN");
+    const recentCheckIns = checkedIn
+      .filter((invitation) => invitation.checkIns?.[0]?.checkedInAt)
+      .sort((left, right) =>
+        (right.checkIns?.[0]?.checkedInAt ?? "").localeCompare(
+          left.checkIns?.[0]?.checkedInAt ?? "",
+        ),
+      )
+      .slice(0, 6);
+
+    return {
+      invited: attendees.length,
+      accepted: accepted.length,
+      declined: declined.length,
+      open: open.length,
+      checkedIn: checkedIn.length,
+      expectedPersons,
+      checkedInPersons,
+      companionExpected,
+      companionCheckedIn,
+      noShows,
+      recentCheckIns,
+      attendanceRate:
+        expectedPersons > 0 ? Math.round((checkedInPersons / expectedPersons) * 100) : 0,
+      capacityRate:
+        activeEvent?.capacity && activeEvent.capacity > 0
+          ? Math.round((expectedPersons / activeEvent.capacity) * 100)
+          : null,
+    };
+  }, [activeEvent?.capacity, attendees]);
 
   const filteredAttendees = useMemo(() => {
     if (!checkInQuery.trim()) {
@@ -487,6 +595,82 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     });
   }
 
+  function handleImportGuests(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!session?.accessToken || !selectedEventId) {
+      return;
+    }
+
+    const form = event.currentTarget;
+    const fileInput = form.elements.namedItem("guestFile") as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+
+    if (!file) {
+      setInvitationError("Bitte eine CSV- oder XLSX-Datei auswaehlen.");
+      return;
+    }
+
+    setInvitationError(null);
+    setImportResult(null);
+
+    startGuestImportTransition(() => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      fetch(`${API_PROXY_BASE}/events/${selectedEventId}/import-guests`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: formData,
+      })
+        .then(async (result) => {
+          if (!result.ok) {
+            const payload = await result.json().catch(() => null);
+            throw new Error(payload?.message ?? "Guest import failed");
+          }
+
+          return result.json() as Promise<ContactImportResult>;
+        })
+        .then((payload) => {
+          setImportResult(payload);
+          form.reset();
+          return Promise.all([
+            apiRequest<Contact[]>(
+              `/contacts${deferredQuery ? `?query=${encodeURIComponent(deferredQuery)}` : ""}`,
+              {},
+              session.accessToken,
+            ),
+            apiRequest<EventInvitationRecord[]>(
+              `/events/${selectedEventId}/attendees`,
+              {},
+              session.accessToken,
+            ),
+          ]);
+        })
+        .then(([contactItems, invitationItems]) => {
+          setContacts(contactItems);
+          setAttendees(invitationItems);
+          setEvents((current) =>
+            current.map((event) =>
+              event.id === selectedEventId
+                ? {
+                    ...event,
+                    _count: {
+                      invitations: invitationItems.length,
+                    },
+                  }
+                : event,
+            ),
+          );
+        })
+        .catch((error: Error) => {
+          setInvitationError(error.message);
+        });
+    });
+  }
+
   async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -511,6 +695,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             timezone: eventForm.timezone,
             capacity: eventForm.capacity ? Number(eventForm.capacity) : undefined,
             status: eventForm.status,
+            allowCompanion: eventForm.allowCompanion,
           }),
         },
         session.accessToken,
@@ -606,7 +791,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         `/events/${selectedEventId}/send-invitations`,
         {
           method: "POST",
-          body: JSON.stringify({ templateType: "INVITATION" }),
+          body: JSON.stringify({
+            templateType: "INVITATION",
+            subject: invitationTemplate.subject,
+            body: invitationTemplate.body,
+          }),
         },
         session.accessToken,
       )
@@ -624,6 +813,13 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
           setInvitationError(error.message);
         });
     });
+  }
+
+  function insertTemplateField(target: keyof InvitationTemplateState, token: string) {
+    setInvitationTemplate((current) => ({
+      ...current,
+      [target]: `${current[target]}{{${token}}}`,
+    }));
   }
 
   function handleProcessEmailQueue() {
@@ -678,6 +874,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             invitationId,
             method: "MANUAL",
             deviceInfo: "web-dashboard",
+            companionPresent: false,
           }),
         },
         session.accessToken,
@@ -703,7 +900,36 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       return;
     }
 
-    submitQrCheckIn(qrToken.trim());
+    previewQrCheckIn(qrToken.trim());
+  }
+
+  function previewQrCheckIn(tokenValue: string) {
+    if (!session?.accessToken || !selectedEventId || !tokenValue) {
+      return;
+    }
+
+    setInvitationError(null);
+
+    startInvitationTransition(() => {
+      apiRequest<EventInvitationRecord>(
+        `/events/${selectedEventId}/check-in/preview`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            qrToken: tokenValue,
+            method: "QR",
+          }),
+        },
+        session.accessToken,
+      )
+        .then((preview) => {
+          setCheckInPreview(preview);
+          setCompanionPresent(preview.registration?.companionRequested === true);
+        })
+        .catch((error: Error) => {
+          setInvitationError(error.message);
+        });
+    });
   }
 
   function submitQrCheckIn(tokenValue: string) {
@@ -722,6 +948,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             qrToken: tokenValue,
             method: "QR",
             deviceInfo: "web-dashboard-qr",
+            companionPresent,
           }),
         },
         session.accessToken,
@@ -736,6 +963,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         .then((items) => {
           setAttendees(items);
           setQrToken("");
+          setCheckInPreview(null);
+          setCompanionPresent(false);
           setScannerError(null);
         })
         .catch((error: Error) => {
@@ -784,7 +1013,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         if (match?.rawValue) {
           stopQrScanner();
           setQrToken(match.rawValue);
-          submitQrCheckIn(match.rawValue);
+          previewQrCheckIn(match.rawValue);
           return;
         }
       } catch (error) {
@@ -832,7 +1061,6 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     }
   }
 
-  const activeEvent = events.find((event) => event.id === selectedEventId) ?? null;
   const selectedContactsCount = selectedContactIds.length;
   const overviewCards = [
     {
@@ -852,6 +1080,12 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       href: "/backoffice/invitations",
       text: "Gaestelisten zusammenstellen, Versand vorbereiten und Queue anstossen.",
       chips: [`${invitationStats.total} Einladungen`, `${invitationStats.registered} registriert`],
+    },
+    {
+      title: "Live-Dashboard",
+      href: "/backoffice/live",
+      text: "Veranstaltungsstand live verfolgen: Zusagen, Einlass, No-shows und Kapazitaet.",
+      chips: [`${liveStats.checkedInPersons} vor Ort`, `${liveStats.attendanceRate}% Einlass`],
     },
     {
       title: "Check-in",
@@ -1325,6 +1559,26 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                     </select>
                   </label>
 
+                  <label className="selector-row field-wide">
+                    <input
+                      checked={eventForm.allowCompanion}
+                      onChange={(event) =>
+                        setEventForm((current) => ({
+                          ...current,
+                          allowCompanion: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong>Begleitung erlauben</strong>
+                      <small>
+                        Gaeste koennen bei der Anmeldung eine Begleitperson mit Vor- und
+                        Nachname angeben.
+                      </small>
+                    </span>
+                  </label>
+
                   <button
                     className="primary-button field-wide"
                     disabled={isSubmittingEvent}
@@ -1366,6 +1620,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                             : "Keine Kapazitaet gesetzt"}
                           {` · ${event.timezone}`}
                         </p>
+                        <p className="event-meta">
+                          {event.allowCompanion
+                            ? "Begleitung erlaubt"
+                            : "Einladung gilt nur persoenlich"}
+                        </p>
                         {event.description ? (
                           <p className="event-description">{event.description}</p>
                         ) : null}
@@ -1375,6 +1634,192 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                 </div>
               </>
             )}
+            </section>
+          ) : null}
+
+          {section === "live" && isSectionAllowed ? (
+            <section className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-label">Veranstaltungsdashboard</p>
+                  <h2>Live-Status</h2>
+                </div>
+                <div className="chip-row">
+                  <span className="stat-chip">{liveStats.attendanceRate}% Einlassquote</span>
+                  <span className="stat-chip">{liveStats.checkedInPersons} Personen vor Ort</span>
+                </div>
+              </div>
+
+              {!session ? (
+                <p className="empty-state">
+                  Melde dich zuerst an. Danach kannst du den Live-Status eines Events sehen.
+                </p>
+              ) : events.length === 0 ? (
+                <p className="empty-state">
+                  Lege zuerst ein Event an. Danach steht das Live-Dashboard bereit.
+                </p>
+              ) : (
+                <>
+                  <label className="field planner-select">
+                    <span>Aktives Event</span>
+                    <select
+                      className="select-input"
+                      onChange={(event) => setSelectedEventId(event.target.value)}
+                      value={selectedEventId}
+                    >
+                      <option value="">Event waehlen</option>
+                      {events.map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {!selectedEventId || !activeEvent ? (
+                    <p className="empty-state">
+                      Waehle ein Event, um Einladungen, Zusagen und Einlass live zu verfolgen.
+                    </p>
+                  ) : (
+                    <>
+                      {invitationError ? <p className="error-box">{invitationError}</p> : null}
+
+                      <div className="live-hero">
+                        <div>
+                          <p className="section-label">{formatStatus(activeEvent.status)}</p>
+                          <h3>{activeEvent.title}</h3>
+                          <p>
+                            {formatDateTime(activeEvent.startsAt)} · {activeEvent.locationName}
+                          </p>
+                        </div>
+                        <div className="live-gauge">
+                          <strong>{liveStats.checkedInPersons}</strong>
+                          <span>von {liveStats.expectedPersons || 0} erwarteten Personen</span>
+                        </div>
+                      </div>
+
+                      <div className="live-kpi-grid">
+                        <article className="live-kpi-card">
+                          <span>Eingeladen</span>
+                          <strong>{liveStats.invited}</strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Zugesagt</span>
+                          <strong>{liveStats.accepted}</strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Offen</span>
+                          <strong>{liveStats.open}</strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Abgesagt</span>
+                          <strong>{liveStats.declined}</strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Eingecheckt</span>
+                          <strong>{liveStats.checkedIn}</strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Personen vor Ort</span>
+                          <strong>{liveStats.checkedInPersons}</strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Begleitungen</span>
+                          <strong>
+                            {liveStats.companionCheckedIn}/{liveStats.companionExpected}
+                          </strong>
+                        </article>
+                        <article className="live-kpi-card">
+                          <span>Kapazitaet</span>
+                          <strong>
+                            {activeEvent.capacity
+                              ? `${liveStats.capacityRate}%`
+                              : "offen"}
+                          </strong>
+                        </article>
+                      </div>
+
+                      <div className="live-progress">
+                        <div>
+                          <span>Einlassfortschritt</span>
+                          <strong>{liveStats.attendanceRate}%</strong>
+                        </div>
+                        <meter
+                          max={100}
+                          min={0}
+                          value={Math.min(liveStats.attendanceRate, 100)}
+                        />
+                      </div>
+
+                      <div className="planner-grid">
+                        <div className="selection-panel">
+                          <p className="section-label">Zugesagt, noch nicht da</p>
+                          <div className="selection-list">
+                            {liveStats.noShows.length === 0 ? (
+                              <p className="empty-state">
+                                Alle zugesagten Gaeste sind eingecheckt oder es gibt noch keine
+                                Zusagen.
+                              </p>
+                            ) : (
+                              liveStats.noShows.slice(0, 8).map((invitation) => (
+                                <article className="attendee-card" key={`${invitation.id}-live-open`}>
+                                  <div className="attendee-head">
+                                    <div>
+                                      <strong>
+                                        {invitation.contact.firstName}{" "}
+                                        {invitation.contact.lastName}
+                                      </strong>
+                                      <small>
+                                        {invitation.contact.company ?? "Ohne Firma"} ·{" "}
+                                        {invitation.contact.email}
+                                      </small>
+                                    </div>
+                                    <span className="tag">
+                                      {invitation.registration?.guestCount ?? 1} Pers.
+                                    </span>
+                                  </div>
+                                </article>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="selection-panel">
+                          <p className="section-label">Zuletzt eingecheckt</p>
+                          <div className="selection-list">
+                            {liveStats.recentCheckIns.length === 0 ? (
+                              <p className="empty-state">Noch keine Check-ins fuer dieses Event.</p>
+                            ) : (
+                              liveStats.recentCheckIns.map((invitation) => (
+                                <article className="attendee-card" key={`${invitation.id}-recent`}>
+                                  <div className="attendee-head">
+                                    <div>
+                                      <strong>
+                                        {invitation.contact.firstName}{" "}
+                                        {invitation.contact.lastName}
+                                      </strong>
+                                      <small>
+                                        {invitation.checkIns?.[0]?.checkedInAt
+                                          ? formatDateTime(invitation.checkIns[0].checkedInAt)
+                                          : "Zeitpunkt unbekannt"}
+                                      </small>
+                                    </div>
+                                    <span className="tag">
+                                      {invitation.checkIns?.[0]?.companionPresent
+                                        ? "+ Begleitung"
+                                        : "Solo"}
+                                    </span>
+                                  </div>
+                                </article>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </section>
           ) : null}
 
@@ -1389,7 +1834,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                 <span className="stat-chip">{invitationStats.total} eingeladen</span>
                 <span className="stat-chip">{invitationStats.queued} queued</span>
                 <span className="stat-chip">{invitationStats.registered} registriert</span>
-                <span className="stat-chip">{invitationStats.checkedIn} eingecheckt</span>
+                <span className="stat-chip">
+                  {invitationStats.checkedInPersons} Personen eingecheckt
+                </span>
               </div>
             </div>
 
@@ -1456,6 +1903,92 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                       <p className="error-box">{invitationError}</p>
                     ) : null}
 
+                    <form className="import-form guest-import-form" onSubmit={handleImportGuests}>
+                      <label className="field field-wide">
+                        <span>Gaesteliste fuer dieses Event importieren</span>
+                        <input accept=".csv,.xlsx" name="guestFile" type="file" />
+                      </label>
+                      <button
+                        className="ghost-button field-wide"
+                        disabled={isImportingGuests}
+                        type="submit"
+                      >
+                        {isImportingGuests
+                          ? "Gaesteliste wird importiert..."
+                          : "Excel/CSV als Gaesteliste importieren"}
+                      </button>
+                    </form>
+
+                    {importResult ? (
+                      <div className="success-box">
+                        <strong>Import abgeschlossen: {importResult.filename}</strong>
+                        <p>
+                          {importResult.importedRows} von {importResult.totalRows} Zeilen verarbeitet,
+                          {` ${importResult.createdInvitations ?? 0} neue Einladungen, ${importResult.skippedInvitations ?? importResult.duplicates} bereits vorhanden, ${importResult.errorRows} Fehler`}
+                        </p>
+                        {importResult.errors.slice(0, 3).map((entry) => (
+                          <p key={`${entry.row}-${entry.message}`}>
+                            Zeile {entry.row}: {entry.message}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="template-panel">
+                      <div className="panel-head compact-head">
+                        <div>
+                          <p className="section-label">Serienbrief</p>
+                          <h3>Einladungstext</h3>
+                        </div>
+                      </div>
+
+                      <label className="field field-wide">
+                        <span>Betreff</span>
+                        <input
+                          onChange={(event) =>
+                            setInvitationTemplate((current) => ({
+                              ...current,
+                              subject: event.target.value,
+                            }))
+                          }
+                          value={invitationTemplate.subject}
+                        />
+                      </label>
+
+                      <label className="field field-wide">
+                        <span>Mail-Text</span>
+                        <textarea
+                          className="textarea-input"
+                          onChange={(event) =>
+                            setInvitationTemplate((current) => ({
+                              ...current,
+                              body: event.target.value,
+                            }))
+                          }
+                          rows={10}
+                          value={invitationTemplate.body}
+                        />
+                      </label>
+
+                      <p className="template-help">
+                        Platzhalter werden beim Versand je Gast ersetzt. Der Antwortlink und
+                        QR-Code werden weiterhin automatisch erzeugt.
+                      </p>
+
+                      <div className="template-field-grid">
+                        {TEMPLATE_FIELDS.map((field) => (
+                          <button
+                            className="field-chip"
+                            key={field.token}
+                            onClick={() => insertTemplateField("body", field.token)}
+                            type="button"
+                          >
+                            {field.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="planner-grid">
                       <div className="selection-panel">
                         <p className="section-label">Kontakte auswaehlen</p>
@@ -1507,7 +2040,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                                 <p className="attendee-meta">
                                   Jobs: {invitation.emailJobs.length}
                                   {invitation.registration
-                                    ? ` · Antwort ${invitation.registration.response}`
+                                    ? ` · Antwort ${invitation.registration.response}${
+                                      invitation.registration.companionRequested
+                                          ? ` · Begleitung: ${invitation.registration.companionFirstName ?? ""} ${invitation.registration.companionLastName ?? ""}`
+                                          : ""
+                                      }`
                                     : ""}
                                 </p>
                               </article>
@@ -1544,6 +2081,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                 </div>
                 <div className="chip-row">
                   <span className="stat-chip">{invitationStats.checkedIn} eingecheckt</span>
+                  <span className="stat-chip">
+                    {invitationStats.checkedInPersons} Personen durch Einlass
+                  </span>
                   <span className="stat-chip">{filteredAttendees.length} Treffer</span>
                 </div>
               </div>
@@ -1642,9 +2182,53 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                           onClick={handleQrCheckIn}
                           type="button"
                         >
-                          QR Check-in ausfuehren
+                          QR pruefen
                         </button>
                       </div>
+
+                      {checkInPreview ? (
+                        <div className="checkin-preview">
+                          <p className="section-label">Scan erkannt</p>
+                          <h3>
+                            {checkInPreview.contact.firstName}{" "}
+                            {checkInPreview.contact.lastName}
+                          </h3>
+                          <p className="attendee-meta">
+                            Status: {formatInvitationStatus(checkInPreview.status)}
+                          </p>
+                          {checkInPreview.registration?.companionRequested ? (
+                            <label className="selector-row">
+                              <input
+                                checked={companionPresent}
+                                onChange={(event) => setCompanionPresent(event.target.checked)}
+                                type="checkbox"
+                              />
+                              <span>
+                                <strong>Begleitung ist dabei</strong>
+                                <small>
+                                  {checkInPreview.registration.companionFirstName}{" "}
+                                  {checkInPreview.registration.companionLastName}
+                                </small>
+                              </span>
+                            </label>
+                          ) : (
+                            <p className="empty-state">
+                              Fuer diese Anmeldung ist keine Begleitung hinterlegt.
+                            </p>
+                          )}
+                          <button
+                            className="primary-button"
+                            disabled={
+                              isSubmittingInvitations ||
+                              !["SENT", "REGISTERED"].includes(checkInPreview.status)
+                            }
+                            onClick={() => submitQrCheckIn(qrToken.trim())}
+                            type="button"
+                          >
+                            Check-in bestaetigen
+                          </button>
+                        </div>
+                      ) : null}
 
                       <label className="field search-field">
                         <span>Suche in der Gaesteliste</span>
@@ -1680,7 +2264,17 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                                 {invitation.checkIns?.[0]?.checkedInAt
                                   ? formatDateTime(invitation.checkIns[0].checkedInAt)
                                   : "noch keiner"}
+                                {invitation.checkIns?.[0]?.companionPresent
+                                  ? " · Begleitung dabei"
+                                  : ""}
                               </p>
+                              {invitation.registration?.companionRequested ? (
+                                <p className="attendee-meta">
+                                  Begleitung angemeldet:{" "}
+                                  {invitation.registration.companionFirstName}{" "}
+                                  {invitation.registration.companionLastName}
+                                </p>
+                              ) : null}
                               <div className="planner-actions compact-actions">
                                 <button
                                   className="primary-button"

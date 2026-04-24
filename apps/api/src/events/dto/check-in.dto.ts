@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class CheckInDto {
   @IsOptional()
@@ -17,4 +17,8 @@ export class CheckInDto {
   @IsString()
   @MaxLength(255)
   deviceInfo?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  companionPresent?: boolean;
 }

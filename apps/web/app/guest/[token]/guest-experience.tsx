@@ -21,11 +21,16 @@ type InvitationPayload = {
     startsAt: string;
     endsAt: string;
     timezone: string;
+    allowCompanion: boolean;
   };
   registration: {
     response: "ACCEPTED" | "DECLINED";
     guestCount: number;
     comment: string | null;
+    dietaryRequirements: string | null;
+    companionRequested?: boolean;
+    companionFirstName?: string | null;
+    companionLastName?: string | null;
   } | null;
 };
 
@@ -40,6 +45,9 @@ export function GuestExperience({ token }: { token: string }) {
   const [invitation, setInvitation] = useState<InvitationPayload | null>(null);
   const [response, setResponse] = useState<"ACCEPTED" | "DECLINED">("ACCEPTED");
   const [guestCount, setGuestCount] = useState("1");
+  const [companionRequested, setCompanionRequested] = useState(false);
+  const [companionFirstName, setCompanionFirstName] = useState("");
+  const [companionLastName, setCompanionLastName] = useState("");
   const [comment, setComment] = useState("");
   const [dietaryRequirements, setDietaryRequirements] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +73,11 @@ export function GuestExperience({ token }: { token: string }) {
             if (payload.registration) {
               setResponse(payload.registration.response);
               setGuestCount(String(payload.registration.guestCount));
+              setCompanionRequested(payload.registration.companionRequested === true);
+              setCompanionFirstName(payload.registration.companionFirstName ?? "");
+              setCompanionLastName(payload.registration.companionLastName ?? "");
               setComment(payload.registration.comment ?? "");
+              setDietaryRequirements(payload.registration.dietaryRequirements ?? "");
             }
           }
         })
@@ -97,6 +109,14 @@ export function GuestExperience({ token }: { token: string }) {
           guestCount: response === "ACCEPTED" ? Number(guestCount) : 1,
           comment: comment || undefined,
           dietaryRequirements: dietaryRequirements || undefined,
+          companionRequested:
+            response === "ACCEPTED" && invitation?.event.allowCompanion
+              ? companionRequested
+              : false,
+          companionFirstName:
+            companionRequested && response === "ACCEPTED" ? companionFirstName : undefined,
+          companionLastName:
+            companionRequested && response === "ACCEPTED" ? companionLastName : undefined,
         }),
       })
         .then(async (result) => {
@@ -165,16 +185,44 @@ export function GuestExperience({ token }: { token: string }) {
                 </select>
               </label>
 
-              <label className="field">
-                <span>Anzahl Personen</span>
-                <input
-                  disabled={response !== "ACCEPTED"}
-                  min="1"
-                  onChange={(event) => setGuestCount(event.target.value)}
-                  type="number"
-                  value={guestCount}
-                />
-              </label>
+              {invitation.event.allowCompanion && response === "ACCEPTED" ? (
+                <label className="selector-row field-wide">
+                  <input
+                    checked={companionRequested}
+                    onChange={(event) => {
+                      setCompanionRequested(event.target.checked);
+                      setGuestCount(event.target.checked ? "2" : "1");
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>Ich bringe eine Begleitung mit</strong>
+                    <small>Bitte Vor- und Nachname der Begleitperson angeben.</small>
+                  </span>
+                </label>
+              ) : null}
+
+              {invitation.event.allowCompanion && companionRequested && response === "ACCEPTED" ? (
+                <>
+                  <label className="field">
+                    <span>Vorname Begleitung</span>
+                    <input
+                      onChange={(event) => setCompanionFirstName(event.target.value)}
+                      required
+                      value={companionFirstName}
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>Nachname Begleitung</span>
+                    <input
+                      onChange={(event) => setCompanionLastName(event.target.value)}
+                      required
+                      value={companionLastName}
+                    />
+                  </label>
+                </>
+              ) : null}
 
               <label className="field">
                 <span>Besondere Wuensche</span>
