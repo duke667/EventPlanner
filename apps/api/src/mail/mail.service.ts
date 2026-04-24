@@ -82,7 +82,7 @@ export class MailService {
 
         const result =
           job.templateType === "CONFIRMATION"
-            ? await this.sendConfirmationMail(transporter, job)
+            ? await this.sendConfirmationMail(transporter, job.invitation.id)
             : await this.sendInvitationMail(transporter, job);
 
         await this.prisma.emailJob.update({
@@ -112,6 +112,38 @@ export class MailService {
     }
 
     return { processed };
+  }
+
+  async sendConfirmationForInvitation(invitationId: string) {
+    const transporter = nodemailer.createTransport(
+      this.configService.get<string>("MAIL_TRANSPORT_URL") ?? "smtp://localhost:1025",
+    );
+    const job = await this.prisma.emailJob.create({
+      data: {
+        eventInvitationId: invitationId,
+        templateType: "CONFIRMATION",
+        status: "QUEUED",
+      },
+    });
+
+    try {
+      const result = await this.sendConfirmationMail(transporter, invitationId);
+
+      await this.prisma.emailJob.update({
+        where: { id: job.id },
+        data: {
+          status: "SENT",
+          providerMessageId: result.messageId,
+          sentAt: new Date(),
+          errorMessage: null,
+        },
+      });
+
+      return { ok: true };
+    } catch (error) {
+      await this.markFailed(job.id, error instanceof Error ? error.message : "Unknown error");
+      throw error;
+    }
   }
 
   buildCalendarAttachment(invitation: InvitationWithRelations) {
@@ -225,10 +257,10 @@ export class MailService {
 
   private async sendConfirmationMail(
     transporter: nodemailer.Transporter,
-    job: EmailJobWithRelations,
+    invitationId: string,
   ) {
     const invitation = await this.prisma.eventInvitation.findUnique({
-      where: { id: job.invitation!.id },
+      where: { id: invitationId },
       include: {
         event: true,
         contact: true,
@@ -242,6 +274,11 @@ export class MailService {
 
     const token = this.guestTokenService.createInvitationToken(invitation.id);
     const ics = this.buildCalendarAttachment(invitation);
+    const checkInToken = this.guestTokenService.createCheckInToken(
+      invitation.eventId,
+      invitation.id,
+    );
+    const qrAttachment = await this.createQrAttachment(checkInToken);
     const calendarUrl = `${
       this.configService.get<string>("NEXT_PUBLIC_API_URL") ?? "http://localhost:4000"
     }/api/guest/invitation/${token}/ics`;
@@ -254,14 +291,20 @@ export class MailService {
         `Hallo ${invitation.contact.firstName} ${invitation.contact.lastName},`,
         "",
         `deine Anmeldung fuer "${invitation.event.title}" wurde bestaetigt.`,
+        "Deinen QR-Code fuer den Einlass findest du im Anhang dieser E-Mail.",
+        `Fallback-Code fuer den Check-in: ${checkInToken}`,
         `Kalendereintrag: ${calendarUrl}`,
       ].join("\n"),
       html: [
         `<p>Hallo ${invitation.contact.firstName} ${invitation.contact.lastName},</p>`,
         `<p>deine Anmeldung fuer <strong>${invitation.event.title}</strong> wurde bestaetigt.</p>`,
+        `<p><strong>QR-Check-in:</strong><br />Bitte diesen Code am Einlass vorzeigen.</p>`,
+        '<p><img src="cid:checkin-qr@eventmanager" alt="QR-Code fuer den Check-in" width="180" height="180" /></p>',
+        `<p><strong>Fallback-Code:</strong><br /><code>${this.escapeHtml(checkInToken)}</code></p>`,
         `<p><a href="${calendarUrl}">ICS herunterladen</a></p>`,
       ].join(""),
       attachments: [
+        qrAttachment,
         {
           filename: "event.ics",
           content: ics,

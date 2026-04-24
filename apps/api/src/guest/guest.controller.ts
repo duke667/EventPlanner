@@ -17,6 +17,11 @@ export class GuestController {
     return this.guestService.respond(token, dto);
   }
 
+  @Post("invitation/:token/resend-qr")
+  resendQrCode(@Param("token") token: string) {
+    return this.guestService.resendQrCode(token);
+  }
+
   @Get("invitation/:token/ics")
   async getCalendarFile(@Param("token") token: string, @Res() response: Response) {
     const calendar = await this.guestService.getCalendarFile(token);

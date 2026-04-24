@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InvitationStatus, RegistrationResponse } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail/mail.service";
@@ -120,6 +120,21 @@ export class GuestService {
   async getCalendarFile(token: string) {
     const invitation = await this.findInvitationByToken(token);
     return this.mailService.buildCalendarAttachment(invitation);
+  }
+
+  async resendQrCode(token: string) {
+    const invitation = await this.findInvitationByToken(token);
+
+    if (
+      invitation.status !== InvitationStatus.REGISTERED &&
+      invitation.status !== InvitationStatus.CHECKED_IN
+    ) {
+      throw new BadRequestException("QR-Code kann erst nach einer Zusage versendet werden");
+    }
+
+    await this.mailService.sendConfirmationForInvitation(invitation.id);
+
+    return { ok: true };
   }
 
   async createGuestLink(invitationId: string) {

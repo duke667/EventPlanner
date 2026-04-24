@@ -52,6 +52,8 @@ export function GuestExperience({ token }: { token: string }) {
   const [dietaryRequirements, setDietaryRequirements] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const [isResending, startResendTransition] = useTransition();
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function GuestExperience({ token }: { token: string }) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    setResendSuccess(null);
 
     startTransition(() => {
       fetch(`${API_PROXY_BASE}/guest/invitation/${token}/respond`, {
@@ -127,15 +130,51 @@ export function GuestExperience({ token }: { token: string }) {
 
           return result.json();
         })
-        .then(() => {
+        .then((payload: { registration: InvitationPayload["registration"] }) => {
+          if (payload.registration) {
+            setInvitation((current) =>
+              current
+                ? {
+                    ...current,
+                    status: response === "ACCEPTED" ? "REGISTERED" : "DECLINED",
+                    registration: payload.registration,
+                  }
+                : current,
+            );
+          }
           setSuccess(
             response === "ACCEPTED"
-              ? "Deine Teilnahme ist registriert. Die Bestaetigungsmail wird vorbereitet."
+              ? "Deine Teilnahme ist registriert. Die Bestaetigungsmail mit QR-Code wird versendet."
               : "Deine Absage wurde gespeichert.",
           );
         })
         .catch((submitError: Error) => {
           setError(submitError.message);
+        });
+    });
+  }
+
+  function handleResendQrCode() {
+    setError(null);
+    setResendSuccess(null);
+
+    startResendTransition(() => {
+      fetch(`${API_PROXY_BASE}/guest/invitation/${token}/resend-qr`, {
+        method: "POST",
+      })
+        .then(async (result) => {
+          if (!result.ok) {
+            const payload = await result.json().catch(() => null);
+            throw new Error(payload?.message ?? "QR-Code konnte nicht erneut versendet werden");
+          }
+
+          return result.json();
+        })
+        .then(() => {
+          setResendSuccess("Die E-Mail mit QR-Code wurde erneut versendet.");
+        })
+        .catch((resendError: Error) => {
+          setError(resendError.message);
         });
     });
   }
@@ -245,9 +284,29 @@ export function GuestExperience({ token }: { token: string }) {
 
             {success ? <p className="success-box">{success}</p> : null}
 
-            <a className="guest-link" href={`${API_PROXY_BASE}/guest/invitation/${token}/ics`}>
-              ICS-Datei herunterladen
-            </a>
+            {invitation.registration?.response === "ACCEPTED" ? (
+              <div className="guest-ticket-box">
+                <p className="section-label">Dein Ticket</p>
+                <p>
+                  Nach deiner Zusage bekommst du eine E-Mail mit QR-Code fuer den
+                  Einlass und dem Kalendereintrag.
+                </p>
+                <div className="guest-ticket-actions">
+                  <button
+                    className="ghost-button"
+                    disabled={isResending}
+                    onClick={handleResendQrCode}
+                    type="button"
+                  >
+                    {isResending ? "Wird versendet..." : "QR-Code erneut per E-Mail senden"}
+                  </button>
+                  <a className="guest-link" href={`${API_PROXY_BASE}/guest/invitation/${token}/ics`}>
+                    ICS-Datei herunterladen
+                  </a>
+                </div>
+                {resendSuccess ? <p className="success-box">{resendSuccess}</p> : null}
+              </div>
+            ) : null}
           </>
         ) : (
           <p className="empty-state">Einladung wird geladen...</p>
