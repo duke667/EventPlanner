@@ -1066,31 +1066,31 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     {
       title: "Kontakte",
       href: "/backoffice/contacts",
-      text: "Kontaktbasis pflegen, durchsuchen und Importe verarbeiten.",
+      text: "Adressen pflegen, suchen und fuer Einladungen vorbereiten.",
       chips: [`${stats.total} Kontakte`, `${stats.companies} Firmen`],
     },
     {
       title: "Events",
       href: "/backoffice/events",
-      text: "Events anlegen, Status steuern und Kapazitaeten pflegen.",
+      text: "Veranstaltungen anlegen, Kapazitaeten planen und Status steuern.",
       chips: [`${eventStats.total} Events`, `${eventStats.published} live`],
     },
     {
       title: "Einladungen",
       href: "/backoffice/invitations",
-      text: "Gaestelisten zusammenstellen, Versand vorbereiten und Queue anstossen.",
+      text: "Gaestelisten importieren, Einladungstexte erstellen und Versand starten.",
       chips: [`${invitationStats.total} Einladungen`, `${invitationStats.registered} registriert`],
     },
     {
       title: "Live-Dashboard",
       href: "/backoffice/live",
-      text: "Veranstaltungsstand live verfolgen: Zusagen, Einlass, No-shows und Kapazitaet.",
+      text: "Zusagen, Einlass und Personen vor Ort waehrend der Veranstaltung verfolgen.",
       chips: [`${liveStats.checkedInPersons} vor Ort`, `${liveStats.attendanceRate}% Einlass`],
     },
     {
       title: "Check-in",
       href: "/backoffice/checkin",
-      text: "Am Eventtag Gaeste manuell oder per QR-Code erfassen.",
+      text: "Gaeste am Eingang suchen, QR-Codes pruefen und Einlass bestaetigen.",
       chips: [`${invitationStats.checkedIn} eingecheckt`, activeEvent ? activeEvent.title : "kein Event gewaehlt"],
     },
   ];
@@ -1099,10 +1099,10 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     <main className="workspace-shell">
       <section className="workspace-intro">
         <p className="eyebrow">Backoffice</p>
-        <h1>Eventplanung, Einladung und Check-in in einem Arbeitsbereich.</h1>
+        <h1>Veranstaltungen sicher organisieren.</h1>
         <p className="lead">
-          Das Backoffice ist jetzt in echte Arbeitsbereiche getrennt. Damit koennen
-          wir Kontakte, Events, Einladungen und Check-in sauber weiter ausbauen.
+          Kontakte verwalten, Gaeste einladen, Rueckmeldungen verfolgen und den
+          Einlass am Veranstaltungstag im Blick behalten.
         </p>
       </section>
 
@@ -1147,11 +1147,6 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
           {authError ? <p className="error-box">{authError}</p> : null}
 
-          <div className="login-hint">
-            <p className="section-label">Lokale Seed-Daten</p>
-            <p>`admin@example.com` / `ChangeMe123!`</p>
-          </div>
-
           {session ? (
             <div className="identity-card">
               <p className="section-label">Aktive Session</p>
@@ -1184,13 +1179,13 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
               <div className="panel-head">
                 <div>
                   <p className="section-label">Arbeitsbereiche</p>
-                  <h2>Uebersicht</h2>
+                  <h2>Was steht an?</h2>
                 </div>
               </div>
 
               {!session ? (
                 <p className="empty-state">
-                  Melde dich zuerst an. Danach kannst du in die einzelnen Bereiche springen.
+                  Melde dich an, um Veranstaltungen, Gaestelisten und Check-in zu verwalten.
                 </p>
               ) : (
                 <div className="overview-grid">
@@ -1212,7 +1207,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                         ))}
                       </div>
                       <Link className="ghost-button nav-button" href={entry.href}>
-                        Bereich oeffnen
+                        Oeffnen
                       </Link>
                     </article>
                     ))}
@@ -1231,7 +1226,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
               </div>
               <p className="empty-state">
                 Deine Rolle darf diesen Bereich nicht oeffnen. Nutze die sichtbaren
-                Bereiche in der Navigation.
+                Menuepunkte in der Navigation.
               </p>
             </section>
           ) : null}
@@ -1241,7 +1236,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             <div className="panel-head">
               <div>
                 <p className="section-label">Kontaktbasis</p>
-                <h2>Kontakte</h2>
+                <h2>Adressen</h2>
               </div>
               <div className="chip-row">
                 <span className="stat-chip">{stats.total} Kontakte</span>
@@ -1252,8 +1247,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
             {!session ? (
               <p className="empty-state">
-                Melde dich zuerst an. Danach werden Kontakte geladen und du kannst
-                neue Datensaetze anlegen.
+                Melde dich an, um Kontakte zu suchen, anzulegen oder zu importieren.
               </p>
             ) : (
               <>
@@ -1417,7 +1411,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             <div className="panel-head">
               <div>
                 <p className="section-label">Eventplanung</p>
-                <h2>Events</h2>
+                <h2>Veranstaltungen</h2>
               </div>
               <div className="chip-row">
                 <span className="stat-chip">{eventStats.total} Events</span>
@@ -1428,8 +1422,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
             {!session ? (
               <p className="empty-state">
-                Nach dem Login kannst du hier Events anlegen und ihren Status
-                verfolgen.
+                Melde dich an, um Veranstaltungen anzulegen und zu planen.
               </p>
             ) : (
               <>
@@ -1584,7 +1577,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                     disabled={isSubmittingEvent}
                     type="submit"
                   >
-                    {isSubmittingEvent ? "Speichern..." : "Event anlegen"}
+                    {isSubmittingEvent ? "Speichern..." : "Veranstaltung anlegen"}
                   </button>
                 </form>
 
@@ -1642,7 +1635,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
               <div className="panel-head">
                 <div>
                   <p className="section-label">Veranstaltungsdashboard</p>
-                  <h2>Live-Status</h2>
+                  <h2>Live-Stand</h2>
                 </div>
                 <div className="chip-row">
                   <span className="stat-chip">{liveStats.attendanceRate}% Einlassquote</span>
@@ -1652,11 +1645,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
               {!session ? (
                 <p className="empty-state">
-                  Melde dich zuerst an. Danach kannst du den Live-Status eines Events sehen.
+                  Melde dich an, um Zusagen, Einlass und Personen vor Ort live zu verfolgen.
                 </p>
               ) : events.length === 0 ? (
                 <p className="empty-state">
-                  Lege zuerst ein Event an. Danach steht das Live-Dashboard bereit.
+                  Lege zuerst eine Veranstaltung an. Danach steht der Live-Stand bereit.
                 </p>
               ) : (
                 <>
@@ -1667,7 +1660,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                       onChange={(event) => setSelectedEventId(event.target.value)}
                       value={selectedEventId}
                     >
-                      <option value="">Event waehlen</option>
+                      <option value="">Veranstaltung waehlen</option>
                       {events.map((event) => (
                         <option key={event.id} value={event.id}>
                           {event.title}
@@ -1677,8 +1670,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                   </label>
 
                   {!selectedEventId || !activeEvent ? (
-                    <p className="empty-state">
-                      Waehle ein Event, um Einladungen, Zusagen und Einlass live zu verfolgen.
+                     <p className="empty-state">
+                      Waehle eine Veranstaltung, um Zusagen und Einlass live zu verfolgen.
                     </p>
                   ) : (
                     <>
@@ -1828,11 +1821,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             <div className="panel-head">
               <div>
                 <p className="section-label">Einladungsplanung</p>
-                <h2>Gaesteliste</h2>
+                <h2>Einladen</h2>
               </div>
               <div className="chip-row">
                 <span className="stat-chip">{invitationStats.total} eingeladen</span>
-                <span className="stat-chip">{invitationStats.queued} queued</span>
+                <span className="stat-chip">{invitationStats.queued} vorbereitet</span>
                 <span className="stat-chip">{invitationStats.registered} registriert</span>
                 <span className="stat-chip">
                   {invitationStats.checkedInPersons} Personen eingecheckt
@@ -1842,13 +1835,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
             {!session ? (
               <p className="empty-state">
-                Nach dem Login kannst du hier Kontakte einem Event zuordnen und
-                den Versand vorbereiten.
+                Melde dich an, um Gaestelisten zu importieren und Einladungen zu versenden.
               </p>
             ) : events.length === 0 ? (
               <p className="empty-state">
-                Lege zuerst ein Event an. Danach kannst du Kontakte auf die
-                Einladungsliste setzen.
+                Lege zuerst eine Veranstaltung an. Danach kannst du die Gaesteliste vorbereiten.
               </p>
             ) : (
               <>
@@ -1859,7 +1850,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                     onChange={(event) => setSelectedEventId(event.target.value)}
                     value={selectedEventId}
                   >
-                    <option value="">Event waehlen</option>
+                    <option value="">Veranstaltung waehlen</option>
                     {events.map((event) => (
                       <option key={event.id} value={event.id}>
                         {event.title}
@@ -1895,7 +1886,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                         onClick={handleProcessEmailQueue}
                         type="button"
                       >
-                        Queue verarbeiten
+                        Mails versenden
                       </button>
                     </div>
 
@@ -2052,8 +2043,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
                     <div className="checkin-panel">
                       <p className="empty-state">
-                        Der operative Check-in ist jetzt in einen eigenen Bereich verschoben.
-                        Nutze dafuer den Bereich "Check-in".
+                        Den Einlass bearbeitest du im Menuepunkt "Check-in".
                       </p>
                     </div>
                   </>
@@ -2073,7 +2063,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
               <div className="panel-head">
                 <div>
                   <p className="section-label">Eventtag</p>
-                  <h2>Mobiler Check-in</h2>
+                  <h2>Check-in</h2>
                 </div>
                 <div className="chip-row">
                   <span className="stat-chip">{invitationStats.checkedIn} eingecheckt</span>
@@ -2086,11 +2076,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
               {!session ? (
                 <p className="empty-state">
-                  Melde dich zuerst an. Danach kannst du Gaeste manuell oder per QR einchecken.
+                  Melde dich an, um Gaeste am Eingang einzuchecken.
                 </p>
               ) : events.length === 0 ? (
                 <p className="empty-state">
-                  Lege zuerst ein Event an. Danach steht die Check-in-Liste bereit.
+                  Lege zuerst eine Veranstaltung an. Danach steht die Check-in-Liste bereit.
                 </p>
               ) : (
                 <>
@@ -2101,7 +2091,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                       onChange={(event) => setSelectedEventId(event.target.value)}
                       value={selectedEventId}
                     >
-                      <option value="">Event waehlen</option>
+                      <option value="">Veranstaltung waehlen</option>
                       {events.map((event) => (
                         <option key={event.id} value={event.id}>
                           {event.title}
