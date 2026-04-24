@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -110,6 +111,7 @@ model Event {
   endsAt          DateTime      @map("ends_at")
   timezone        String
   capacity        Int?
+  allowCompanion  Boolean       @default(false) @map("allow_companion")
   status          EventStatus   @default(DRAFT)
   createdByUserId String        @map("created_by_user_id")
   createdAt       DateTime      @default(now()) @map("created_at")
@@ -152,6 +154,9 @@ model EventRegistration {
   guestCount        Int                  @default(1) @map("guest_count")
   comment           String?
   dietaryRequirements String?            @map("dietary_requirements")
+  companionRequested Boolean              @default(false) @map("companion_requested")
+  companionFirstName String?              @map("companion_first_name")
+  companionLastName  String?              @map("companion_last_name")
   registeredAt      DateTime             @default(now()) @map("registered_at")
   cancelledAt       DateTime?            @map("cancelled_at")
 
@@ -167,6 +172,7 @@ model CheckIn {
   checkedInAt       DateTime        @default(now()) @map("checked_in_at")
   checkedInByUserId String?         @map("checked_in_by_user_id")
   deviceInfo        String?         @map("device_info")
+  companionPresent  Boolean         @default(false) @map("companion_present")
 
   invitation        EventInvitation @relation(fields: [eventInvitationId], references: [id])
   checkedInBy       User?           @relation(fields: [checkedInByUserId], references: [id])

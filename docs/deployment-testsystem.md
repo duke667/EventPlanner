@@ -83,6 +83,47 @@ Dann mit dem Seed-Admin anmelden und einen kurzen Smoke-Test fahren:
 9. QR-Check-in pruefen: erst Vorschau, dann Check-in bestaetigen und ggf. "Begleitung ist dabei" setzen
 10. Live-Dashboard pruefen: eingeladene, zugesagte, offene, abgesagte und eingecheckte Gaeste sowie Personen vor Ort inklusive Begleitungen
 
+## Echte Test-Mails
+
+Standardmaessig verschickt das Testsystem Mails an Mailpit:
+
+```env
+MAIL_FROM=events-test@example.com
+MAIL_TRANSPORT_URL=smtp://mailpit:1025
+```
+
+Fuer echte Test-Mails muss `MAIL_TRANSPORT_URL` in `.env.test` auf einen erreichbaren SMTP-Server zeigen. Beispiele:
+
+```env
+MAIL_FROM=veranstaltungen@example.com
+MAIL_TRANSPORT_URL=smtp://SMTP_USER:SMTP_PASS@smtp.example.com:587?secure=false
+```
+
+oder fuer Port 465 mit implizitem TLS:
+
+```env
+MAIL_FROM=veranstaltungen@example.com
+MAIL_TRANSPORT_URL=smtps://SMTP_USER:SMTP_PASS@smtp.example.com:465
+```
+
+Nach Aenderung der Mail-Konfiguration:
+
+```bash
+docker compose -f docker-compose.testsystem.yml --env-file .env.test up -d --force-recreate api
+```
+
+Falls Sonderzeichen im SMTP-Benutzer oder Passwort enthalten sind, muessen sie URL-kodiert werden. Beispiel: `@` wird `%40`, `:` wird `%3A`, `/` wird `%2F`.
+
+Vom Mail-Team benoetigte Angaben:
+
+- SMTP-Host und Port
+- Verschluesselung: STARTTLS auf Port 587 oder SMTPS auf Port 465
+- Authentifizierung: Benutzername und Passwort oder IP-Relay ohne Auth
+- erlaubte Absenderadresse fuer `MAIL_FROM`
+- ob die Server-IP des Testsystems fuer SMTP freigeschaltet werden muss
+- ob SPF, DKIM oder DMARC fuer die Absenderdomain vorbereitet werden muessen
+- Versandlimits oder Empfaengerbeschraenkungen fuer das Testsystem
+
 ## Reverse Proxy
 
 Fuer ein sauberes Testsetup sollten `web` und `api` spaeter hinter einem Reverse Proxy mit TLS laufen.
@@ -148,4 +189,3 @@ Vor dem produktiven Einsatz fehlen weiterhin:
 - automatisierte Tests und CI
 - Monitoring/Backups
 - echte Mail-Infrastruktur statt Mailpit
-- produktionsreife Datenbankspalten fuer Begleitpersonen und Event-Optionen statt der aktuellen migrationsfreien Metadatenablage

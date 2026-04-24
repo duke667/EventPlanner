@@ -99,15 +99,14 @@ export class EventsService {
       data: {
         title: dto.title,
         slug,
-        description: this.encodeEventDescription(dto.description, {
-          allowCompanion: dto.allowCompanion === true,
-        }),
+        description: dto.description,
         locationName: dto.locationName,
         locationAddress: dto.locationAddress,
         startsAt,
         endsAt,
         timezone: dto.timezone,
         capacity: dto.capacity,
+        allowCompanion: dto.allowCompanion === true,
         status: dto.status ? (dto.status as EventStatus) : EventStatus.DRAFT,
         createdByUserId: userId,
       },
@@ -143,31 +142,22 @@ export class EventsService {
       slug = await this.createUniqueSlug(baseSlug, existing.id);
     }
 
-    const existingMeta = this.decodeEventDescription(existing.description).meta;
     const event = await this.prisma.event.update({
       where: { id },
       data: {
         title: dto.title,
         slug,
         description:
-          dto.description !== undefined || dto.allowCompanion !== undefined
-            ? this.encodeEventDescription(
-                dto.description ?? this.decodeEventDescription(existing.description).description,
-                {
-                  ...existingMeta,
-                  allowCompanion:
-                    dto.allowCompanion !== undefined
-                      ? dto.allowCompanion
-                      : existingMeta.allowCompanion,
-                },
-              )
-            : undefined,
+          dto.description !== undefined
+            ? dto.description
+            : this.decodeEventDescription(existing.description).description,
         locationName: dto.locationName,
         locationAddress: dto.locationAddress,
         startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
         endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
         timezone: dto.timezone,
         capacity: dto.capacity,
+        allowCompanion: dto.allowCompanion,
         status: dto.status as EventStatus | undefined,
       },
       include: {
@@ -551,9 +541,8 @@ export class EventsService {
         eventInvitationId: invitation.id,
         method: (dto.method as CheckInMethod | undefined) ?? CheckInMethod.MANUAL,
         checkedInByUserId: userId,
-        deviceInfo: this.encodeCheckInDeviceInfo(dto.deviceInfo, {
-          companionPresent: dto.companionPresent === true,
-        }),
+        deviceInfo: dto.deviceInfo,
+        companionPresent: dto.companionPresent === true,
       },
     });
 
@@ -749,11 +738,6 @@ export class EventsService {
     return `__event_manager_guest_fields__:${encoded}`;
   }
 
-  private encodeEventDescription(description: string | undefined | null, meta: EventMeta) {
-    const encoded = Buffer.from(JSON.stringify(meta), "utf8").toString("base64url");
-    return `${EVENT_META_PREFIX}${encoded}\n${description ?? ""}`;
-  }
-
   private decodeEventDescription(description: string | null): {
     description: string | null;
     meta: EventMeta;
@@ -778,19 +762,16 @@ export class EventsService {
     }
   }
 
-  private presentEvent<T extends { description: string | null }>(event: T) {
+  private presentEvent<T extends { description: string | null; allowCompanion?: boolean }>(
+    event: T,
+  ) {
     const decoded = this.decodeEventDescription(event.description);
 
     return {
       ...event,
       description: decoded.description,
-      allowCompanion: decoded.meta.allowCompanion === true,
+      allowCompanion: event.allowCompanion === true || decoded.meta.allowCompanion === true,
     };
-  }
-
-  private encodeRegistrationMeta(value: Record<string, unknown>) {
-    const encoded = Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
-    return `${REGISTRATION_META_PREFIX}${encoded}`;
   }
 
   private decodeRegistrationMeta(value: string | null) {
@@ -832,31 +813,37 @@ export class EventsService {
     const typed = registration as T & {
       dietaryRequirements: string | null;
       guestCount: number;
+      companionRequested?: boolean;
+      companionFirstName?: string | null;
+      companionLastName?: string | null;
     };
     const decoded = this.decodeRegistrationMeta(typed.dietaryRequirements);
+    const legacyCompanionRequested = typed.guestCount > 1;
 
     return {
       ...typed,
       dietaryRequirements: decoded.dietaryRequirements,
-      companionRequested: typed.guestCount > 1,
+      companionRequested: typed.companionRequested === true || legacyCompanionRequested,
       companionFirstName:
-        typeof decoded.meta.companionFirstName === "string"
+        typed.companionFirstName ??
+        (typeof decoded.meta.companionFirstName === "string"
           ? decoded.meta.companionFirstName
-          : null,
+          : null),
       companionLastName:
-        typeof decoded.meta.companionLastName === "string"
+        typed.companionLastName ??
+        (typeof decoded.meta.companionLastName === "string"
           ? decoded.meta.companionLastName
-          : null,
+          : null),
     };
   }
 
-  private encodeCheckInDeviceInfo(deviceInfo: string | undefined, meta: Record<string, unknown>) {
-    const encoded = Buffer.from(JSON.stringify(meta), "utf8").toString("base64url");
-    return `${deviceInfo ?? "web-dashboard"} ${CHECKIN_META_PREFIX}${encoded}`;
-  }
-
   private presentCheckIn<T>(checkIn: T) {
-    const typed = checkIn as T & { deviceInfo?: string | null };
+    const typed = checkIn as T & { deviceInfo?: string | null; companionPresent?: boolean };
+
+    if (typed.companionPresent === true) {
+      return typed;
+    }
+
     const deviceInfo = typed.deviceInfo ?? "";
     const markerIndex = deviceInfo.indexOf(CHECKIN_META_PREFIX);
 

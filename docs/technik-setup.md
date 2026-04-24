@@ -145,12 +145,11 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `ends_at`
 - `timezone`
 - `capacity`
+- `allow_companion`
 - `status`
 - `created_by_user_id`
 - `created_at`
 - `updated_at`
-
-Hinweis aktueller Stand: Die Option `allowCompanion` wird migrationsfrei als interne Metadatenzeile in `description` gespeichert und bei API-Ausgaben wieder entfernt. Das ist fuer das Testsystem pragmatisch, sollte vor produktiver Stabilisierung in eine eigene Spalte migriert werden.
 
 ### `event_invitations`
 
@@ -174,10 +173,11 @@ Hinweis aktueller Stand: Die Option `allowCompanion` wird migrationsfrei als int
 - `guest_count`
 - `comment`
 - `dietary_requirements`
+- `companion_requested`
+- `companion_first_name`
+- `companion_last_name`
 - `registered_at`
 - `cancelled_at`
-
-Hinweis aktueller Stand: Begleitpersonen werden migrationsfrei in `guest_count` und codierten Metadaten in `dietary_requirements` abgebildet. Fuer die Produktion sollte daraus ein explizites Schema werden, z. B. `companion_first_name`, `companion_last_name` und `companion_checked_in`.
 
 ### `check_ins`
 
@@ -187,8 +187,7 @@ Hinweis aktueller Stand: Begleitpersonen werden migrationsfrei in `guest_count` 
 - `checked_in_at`
 - `checked_in_by_user_id`
 - `device_info`
-
-Hinweis aktueller Stand: Ob eine angemeldete Begleitung beim Check-in tatsaechlich dabei war, wird migrationsfrei als interne Metadaten in `device_info` gespeichert und in API-Antworten als `companionPresent` aufbereitet.
+- `companion_present`
 
 ### `email_jobs`
 

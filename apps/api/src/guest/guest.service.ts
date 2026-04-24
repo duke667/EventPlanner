@@ -37,6 +37,7 @@ export class GuestService {
         endsAt: invitation.event.endsAt,
         timezone: invitation.event.timezone,
         allowCompanion:
+          invitation.event.allowCompanion === true ||
           this.decodeEventDescription(invitation.event.description).meta.allowCompanion === true,
       },
       registration: invitation.registration
@@ -49,19 +50,15 @@ export class GuestService {
     const invitation = await this.findInvitationByToken(token);
     const response = dto.response as RegistrationResponse;
     const eventMeta = this.decodeEventDescription(invitation.event.description).meta;
+    const allowCompanion =
+      invitation.event.allowCompanion === true || eventMeta.allowCompanion === true;
     const companionRequested =
       response === RegistrationResponse.ACCEPTED &&
-      eventMeta.allowCompanion === true &&
+      allowCompanion &&
       dto.companionRequested === true;
     const wasAccepted =
       invitation.registration?.response === RegistrationResponse.ACCEPTED &&
       invitation.status === InvitationStatus.REGISTERED;
-    const dietaryRequirements = this.encodeRegistrationMeta({
-      dietaryRequirements: dto.dietaryRequirements,
-      companionRequested,
-      companionFirstName: companionRequested ? dto.companionFirstName : undefined,
-      companionLastName: companionRequested ? dto.companionLastName : undefined,
-    });
 
     const registration = await this.prisma.eventRegistration.upsert({
       where: {
@@ -71,7 +68,10 @@ export class GuestService {
         response,
         guestCount: companionRequested ? 2 : 1,
         comment: dto.comment,
-        dietaryRequirements,
+        dietaryRequirements: dto.dietaryRequirements,
+        companionRequested,
+        companionFirstName: companionRequested ? dto.companionFirstName : null,
+        companionLastName: companionRequested ? dto.companionLastName : null,
         registeredAt: new Date(),
         cancelledAt: response === RegistrationResponse.DECLINED ? new Date() : null,
       },
@@ -80,7 +80,10 @@ export class GuestService {
         response,
         guestCount: companionRequested ? 2 : 1,
         comment: dto.comment,
-        dietaryRequirements,
+        dietaryRequirements: dto.dietaryRequirements,
+        companionRequested,
+        companionFirstName: companionRequested ? dto.companionFirstName : null,
+        companionLastName: companionRequested ? dto.companionLastName : null,
         cancelledAt: response === RegistrationResponse.DECLINED ? new Date() : null,
       },
     });
@@ -202,11 +205,6 @@ export class GuestService {
     }
   }
 
-  private encodeRegistrationMeta(value: Record<string, unknown>) {
-    const encoded = Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
-    return `${REGISTRATION_META_PREFIX}${encoded}`;
-  }
-
   private decodeRegistrationMeta(value: string | null) {
     if (!value?.startsWith(REGISTRATION_META_PREFIX)) {
       return { dietaryRequirements: value, meta: {} as Record<string, unknown> };
@@ -227,23 +225,33 @@ export class GuestService {
     }
   }
 
-  private presentRegistration<T extends { dietaryRequirements: string | null; guestCount: number }>(
-    registration: T,
-  ) {
+  private presentRegistration<
+    T extends {
+      dietaryRequirements: string | null;
+      guestCount: number;
+      companionRequested?: boolean;
+      companionFirstName?: string | null;
+      companionLastName?: string | null;
+    },
+  >(registration: T) {
     const decoded = this.decodeRegistrationMeta(registration.dietaryRequirements);
+    const legacyCompanionRequested = registration.guestCount > 1;
 
     return {
       ...registration,
       dietaryRequirements: decoded.dietaryRequirements,
-      companionRequested: registration.guestCount > 1,
+      companionRequested:
+        registration.companionRequested === true || legacyCompanionRequested,
       companionFirstName:
-        typeof decoded.meta.companionFirstName === "string"
+        registration.companionFirstName ??
+        (typeof decoded.meta.companionFirstName === "string"
           ? decoded.meta.companionFirstName
-          : null,
+          : null),
       companionLastName:
-        typeof decoded.meta.companionLastName === "string"
+        registration.companionLastName ??
+        (typeof decoded.meta.companionLastName === "string"
           ? decoded.meta.companionLastName
-          : null,
+          : null),
     };
   }
 }

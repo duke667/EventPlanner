@@ -47,7 +47,7 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-eventmanager}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-eventmanager}
       REDIS_URL: redis://redis:6379
-      MAIL_TRANSPORT_URL: smtp://mailpit:1025
+      MAIL_TRANSPORT_URL: ${MAIL_TRANSPORT_URL:-smtp://mailpit:1025}
     ports:
       - "${API_PORT:-4000}:4000"
 
@@ -64,7 +64,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-eventmanager}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-eventmanager}
       REDIS_URL: redis://redis:6379
-      MAIL_TRANSPORT_URL: smtp://mailpit:1025
+      MAIL_TRANSPORT_URL: ${MAIL_TRANSPORT_URL:-smtp://mailpit:1025}
     command: ["npm", "run", "seed:deploy", "-w", "@event-manager/api"]
 
   web:
