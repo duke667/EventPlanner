@@ -5,12 +5,18 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ContactImportSummary } from "./contact-import.types";
 
 type ImportedRow = {
+  salutation?: string;
   firstName: string;
   lastName: string;
   email: string;
   company?: string;
   phone?: string;
   jobTitle?: string;
+  street?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
+  notes?: string;
   tags?: string[];
 };
 
@@ -67,12 +73,18 @@ export class ContactImportService {
 
         await this.prisma.contact.create({
           data: {
+            salutation: normalized.salutation,
             firstName: normalized.firstName,
             lastName: normalized.lastName,
             email: normalized.email,
             company: normalized.company,
             phone: normalized.phone,
             jobTitle: normalized.jobTitle,
+            street: normalized.street,
+            postalCode: normalized.postalCode,
+            city: normalized.city,
+            country: normalized.country,
+            notes: normalized.notes,
             tags: normalized.tags ?? [],
           },
         });
@@ -97,11 +109,15 @@ export class ContactImportService {
         errorRows: errors.length,
         mappingJson: {
           firstName: ["first_name", "firstname", "vorname"],
-          lastName: ["last_name", "lastname", "nachname"],
-          email: ["email", "e-mail"],
-          company: ["company", "firma"],
+          lastName: ["last_name", "lastname", "nachname", "name"],
+          email: ["email", "e-mail", "mail-dienstl1", "mail-privat"],
+          company: ["company", "firma", "amt"],
           phone: ["phone", "telefon"],
           jobTitle: ["job_title", "position", "title"],
+          street: ["street", "strasse", "straße", "privat-str"],
+          postalCode: ["postal_code", "plz", "privat-plz"],
+          city: ["city", "ort", "privat-ort"],
+          country: ["country", "land"],
           tags: ["tags"],
         },
         errorLogJson: {
@@ -160,31 +176,52 @@ export class ContactImportService {
 
   private normalizeRow(row: Record<string, string>): ImportedRow {
     const get = (...candidates: string[]) => {
+      const normalizedCandidates = candidates.map((candidate) =>
+        this.normalizeColumnName(candidate),
+      );
       const entry = Object.entries(row).find(([key]) =>
-        candidates.includes(key.trim().toLowerCase()),
+        normalizedCandidates.includes(this.normalizeColumnName(key)),
       );
       return entry?.[1]?.toString().trim() ?? "";
     };
 
     const firstName = get("first_name", "firstname", "vorname");
-    const lastName = get("last_name", "lastname", "nachname");
-    const email = get("email", "e-mail").toLowerCase();
+    const email = get("email", "e-mail", "mail-dienstl1", "mail-privat").toLowerCase();
+    const fallbackName = email.split("@")[0] || "Kontakt";
+    const lastName =
+      get("last_name", "lastname", "nachname", "name") || get("firma") || fallbackName;
 
-    if (!firstName || !lastName || !email) {
-      throw new Error("firstName, lastName and email are required");
+    if (!lastName || !email) {
+      throw new Error("lastName and email are required");
     }
 
     return {
+      salutation: get("anrede", "persanrede") || undefined,
       firstName,
       lastName,
       email,
-      company: get("company", "firma") || undefined,
+      company: get("company", "firma", "amt") || undefined,
       phone: get("phone", "telefon") || undefined,
       jobTitle: get("job_title", "position", "title") || undefined,
+      street: get("street", "strasse", "straße", "privat-str") || undefined,
+      postalCode: get("postal_code", "plz", "privat-plz") || undefined,
+      city: get("city", "ort", "privat-ort") || undefined,
+      country: get("country", "land") || undefined,
+      notes: get("info") || undefined,
       tags: get("tags")
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean),
     };
+  }
+
+  private normalizeColumnName(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/ß/g, "ss")
+      .replace(/[^a-z0-9]/g, "");
   }
 }
