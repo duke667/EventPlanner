@@ -80,6 +80,8 @@ export class MailService {
     );
 
     let processed = 0;
+    let failed = 0;
+    const errors: Array<{ jobId: string; recipient?: string; message: string }> = [];
 
     for (const job of jobs) {
       try {
@@ -115,11 +117,18 @@ export class MailService {
 
         processed += 1;
       } catch (error) {
-        await this.markFailed(job.id, error instanceof Error ? error.message : "Unknown error");
+        const message = error instanceof Error ? error.message : "Unknown error";
+        await this.markFailed(job.id, message);
+        failed += 1;
+        errors.push({
+          jobId: job.id,
+          recipient: job.invitation?.contact.email,
+          message,
+        });
       }
     }
 
-    return { processed };
+    return { processed, failed, errors };
   }
 
   async sendConfirmationForInvitation(invitationId: string) {

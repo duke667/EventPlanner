@@ -258,6 +258,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [contactError, setContactError] = useState<string | null>(null);
   const [eventError, setEventError] = useState<string | null>(null);
   const [invitationError, setInvitationError] = useState<string | null>(null);
+  const [invitationSuccess, setInvitationSuccess] = useState<string | null>(null);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [scannerSupported, setScannerSupported] = useState(false);
@@ -950,9 +951,10 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     }
 
     setInvitationError(null);
+    setInvitationSuccess(null);
 
     startInvitationTransition(() => {
-      apiRequest<{ queued: number }>(
+      apiRequest<{ queued: number; updated: number }>(
         `/events/${selectedEventId}/send-invitations`,
         {
           method: "POST",
@@ -964,14 +966,19 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         },
         session.accessToken,
       )
-        .then(() =>
+        .then((result) =>
           apiRequest<EventInvitationRecord[]>(
             `/events/${selectedEventId}/attendees`,
             {},
             session.accessToken,
-          ),
+          ).then((items) => ({ items, result })),
         )
-        .then((items) => {
+        .then(({ items, result }) => {
+          setInvitationSuccess(
+            result.queued + result.updated > 0
+              ? `${result.queued} Mailjobs eingeplant, ${result.updated} bestehende aktualisiert. Klicke danach auf "Mails versenden".`
+              : "Keine neuen Mailjobs eingeplant. Entweder wurden die Einladungen bereits versendet oder es gibt keine offenen Einladungen.",
+          );
           setAttendees(items);
         })
         .catch((error: Error) => {
@@ -980,11 +987,13 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     });
   }
 
-  function insertTemplateField(target: keyof InvitationTemplateState, token: string) {
-    setInvitationTemplate((current) => ({
-      ...current,
-      [target]: `${current[target]}{{${token}}}`,
-    }));
+  function formatMailErrors(
+    errors: Array<{ recipient?: string; message: string }>,
+  ) {
+    return errors
+      .slice(0, 3)
+      .map((entry) => `${entry.recipient ?? "unbekannter Empfaenger"}: ${entry.message}`)
+      .join(" | ");
   }
 
   function handleProcessEmailQueue() {
@@ -993,9 +1002,14 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     }
 
     setInvitationError(null);
+    setInvitationSuccess(null);
 
     startInvitationTransition(() => {
-      apiRequest<{ processed: number }>(
+      apiRequest<{
+        processed: number;
+        failed: number;
+        errors: Array<{ jobId: string; recipient?: string; message: string }>;
+      }>(
         "/jobs/process-email-queue",
         {
           method: "POST",
@@ -1003,6 +1017,21 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         },
         session.accessToken,
       )
+        .then((items) => {
+          if (items.failed > 0) {
+            setInvitationError(
+              `${items.failed} Mail(s) konnten nicht versendet werden. ${formatMailErrors(items.errors)}`,
+            );
+          } else {
+            setInvitationSuccess(
+              items.processed > 0
+                ? `${items.processed} Mail(s) erfolgreich versendet.`
+                : "Keine offenen Mailjobs gefunden. Wurde vorher 'Versand vorbereiten' geklickt?",
+            );
+          }
+
+          return items;
+        })
         .then(() =>
           selectedEventId
             ? apiRequest<EventInvitationRecord[]>(
@@ -1021,6 +1050,13 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
           setInvitationError(error.message);
         });
     });
+  }
+
+  function insertTemplateField(target: keyof InvitationTemplateState, token: string) {
+    setInvitationTemplate((current) => ({
+      ...current,
+      [target]: `${current[target]}{{${token}}}`,
+    }));
   }
 
   function handleCheckIn(invitationId: string) {
@@ -2309,6 +2345,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
                     {invitationError ? (
                       <p className="error-box">{invitationError}</p>
+                    ) : null}
+                    {invitationSuccess ? (
+                      <p className="success-box">{invitationSuccess}</p>
                     ) : null}
 
                     <form className="import-form guest-import-form" onSubmit={handleImportGuests}>
