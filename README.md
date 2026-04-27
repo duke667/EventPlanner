@@ -9,9 +9,9 @@ Event-Management-Tool fuer interne Mitarbeiter zur Planung, Einladung, Anmeldung
 - Event-Erstellung inklusive Kapazitaet, Status und Option "Begleitung erlaubt"
 - Gaestelistenimport direkt fuer ein Event aus CSV/XLSX, inklusive spezieller Excel-Spalten fuer Anrede und Serienbrief-Felder
 - Einladungslisten pro Event aus Kontakten oder importierter Gaesteliste
-- frei editierbarer Einladungstext mit Platzhaltern wie `{{contact.personalSalutation}}`, `{{event.title}}`, `{{custom.amt}}` und `{{invitationUrl}}`
+- frei editierbarer Einladungstext mit Platzhaltern wie `{{contact.personalSalutation}}`, `{{event.title}}`, `{{custom.amt}}`, `{{invitationUrl}}` und `{{invitationCode}}`
 - Mail-Queue fuer Einladungen und Bestaetigungen, lokal testbar ueber Mailpit
-- Gastseite fuer Zusage oder Absage, optional mit Begleitperson inklusive Vor- und Nachname
+- Gastseite per persoenlichem Link oder kurzem Einladungscode fuer Zusage oder Absage, optional mit Begleitperson inklusive Vor- und Nachname
 - QR-Code und manueller Check-in
 - Check-in-Vorschau bei QR-Scan mit Bestaetigung, ob eine angemeldete Begleitung tatsaechlich dabei ist
 - Live-Dashboard pro Veranstaltung mit eingeladenen, zugesagten, offenen, abgesagten und eingecheckten Gaesten sowie Personen vor Ort inklusive Begleitungen
@@ -22,10 +22,10 @@ Das System soll folgende Prozesse abdecken:
 
 1. Mitarbeiter pflegen Kontakte manuell oder per Datei-Import.
 2. Mitarbeiter legen Events an und erstellen daraus Einladungslisten.
-3. Eingeladene Gaeste erhalten eine E-Mail mit personalisiertem Link zur Anmeldung.
-4. Nach erfolgreicher Anmeldung erhalten Gaeste eine Bestaetigung inklusive ICS-Kalendereintrag.
+3. Eingeladene Gaeste erhalten eine E-Mail mit personalisiertem Link und kurzem Einladungscode zur Anmeldung.
+4. Nach erfolgreicher Anmeldung erhalten Gaeste eine Bestaetigung inklusive ICS-Kalendereintrag und QR-Code.
 5. Am Eventtag koennen Mitarbeiter auf mobilen Geraeten den Einlass dokumentieren.
-6. Optional kann ein QR-Code aus der Einladung gescannt werden, um den Check-in zu beschleunigen.
+6. Der QR-Code aus der Bestaetigung kann am Einlass gescannt werden.
 7. Veranstaltungsmanager sehen live, wie viele Personen erwartet werden und bereits vor Ort sind.
 
 ## Dokumente

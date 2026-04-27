@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { createHash, randomBytes } from "crypto";
 import { ConfigService } from "@nestjs/config";
-import { CheckInMethod, EventStatus, InvitationStatus } from "@prisma/client";
+import { CheckInMethod, EventStatus, InvitationStatus, Prisma } from "@prisma/client";
 import { parse } from "csv-parse/sync";
 import * as XLSX from "xlsx";
 import { PrismaService } from "../prisma/prisma.service";
@@ -229,22 +229,22 @@ export class EventsService {
 
     const secret = this.configService.get<string>("INVITE_TOKEN_SECRET") ?? "change-me-too";
 
-    await this.prisma.$transaction(
-      toCreate.map((contactId) => {
-        const inviteToken = randomBytes(24).toString("hex");
-        const checkinToken = randomBytes(24).toString("hex");
+    for (const contactId of toCreate) {
+      const inviteToken = randomBytes(24).toString("hex");
+      const checkinToken = randomBytes(24).toString("hex");
+      const accessCode = await this.createUniqueAccessCode();
 
-        return this.prisma.eventInvitation.create({
-          data: {
-            eventId,
-            contactId,
-            status: InvitationStatus.DRAFT,
-            inviteTokenHash: this.hashToken(inviteToken, secret),
-            checkinTokenHash: this.hashToken(checkinToken, secret),
-          },
-        });
-      }),
-    );
+      await this.prisma.eventInvitation.create({
+        data: {
+          eventId,
+          contactId,
+          status: InvitationStatus.DRAFT,
+          accessCode,
+          inviteTokenHash: this.hashToken(inviteToken, secret),
+          checkinTokenHash: this.hashToken(checkinToken, secret),
+        },
+      });
+    }
 
     return {
       created: toCreate.length,
@@ -348,12 +348,14 @@ export class EventsService {
             this.configService.get<string>("INVITE_TOKEN_SECRET") ?? "change-me-too";
           const inviteToken = randomBytes(24).toString("hex");
           const checkinToken = randomBytes(24).toString("hex");
+          const accessCode = await this.createUniqueAccessCode(tx);
 
           await tx.eventInvitation.create({
             data: {
               eventId,
               contactId: contact.id,
               status: InvitationStatus.DRAFT,
+              accessCode,
               inviteTokenHash: this.hashToken(inviteToken, secret),
               checkinTokenHash: this.hashToken(checkinToken, secret),
             },
@@ -618,6 +620,30 @@ export class EventsService {
 
   private hashToken(value: string, secret: string) {
     return createHash("sha256").update(`${secret}:${value}`).digest("hex");
+  }
+
+  private async createUniqueAccessCode(
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const bytes = randomBytes(8);
+      const code = Array.from(bytes)
+        .map((byte) => alphabet[byte % alphabet.length])
+        .join("")
+        .slice(0, 8);
+      const existing = await client.eventInvitation.findUnique({
+        where: { accessCode: code },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return code;
+      }
+    }
+
+    throw new ConflictException("Could not generate invitation access code");
   }
 
   private parseCsv(buffer: Buffer): ImportRow[] {

@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
+import { randomBytes } from "crypto";
 import ical, { ICalCalendarMethod } from "ical-generator";
 import nodemailer from "nodemailer";
 import QRCode from "qrcode";
@@ -24,6 +25,13 @@ type InvitationWithRelations = Prisma.EventInvitationGetPayload<{
     event: true;
     contact: true;
     registration: true;
+  };
+}>;
+
+type InvitationForTemplate = Prisma.EventInvitationGetPayload<{
+  include: {
+    event: true;
+    contact: true;
   };
 }>;
 
@@ -95,7 +103,7 @@ export class MailService {
           },
         });
 
-        if (job.templateType === "INVITATION") {
+        if (job.templateType.startsWith("INVITATION")) {
           await this.prisma.eventInvitation.update({
             where: { id: job.invitation.id },
             data: {
@@ -177,6 +185,25 @@ export class MailService {
     return calendar.toString();
   }
 
+  async buildInvitationPageContent(
+    invitation: InvitationForTemplate,
+    templateType?: string,
+  ) {
+    const accessCode = await this.ensureInvitationAccessCode(
+      invitation.id,
+      invitation.accessCode,
+    );
+    const content = this.buildInvitationContent(invitation, templateType, accessCode);
+    const body = content.body.trimStart().startsWith(content.salutation)
+      ? content.body.trimStart().slice(content.salutation.length).trimStart()
+      : content.body;
+
+    return {
+      ...content,
+      body,
+    };
+  }
+
   private async createQrAttachment(payload: string) {
     const dataUrl = await QRCode.toDataURL(payload, {
       errorCorrectionLevel: "M",
@@ -207,37 +234,21 @@ export class MailService {
     job: EmailJobWithRelations,
   ) {
     const invitation = job.invitation!;
-    const token = this.guestTokenService.createInvitationToken(invitation.id);
-    const checkInToken = this.guestTokenService.createCheckInToken(
-      invitation.eventId,
+    const accessCode = await this.ensureInvitationAccessCode(
       invitation.id,
+      invitation.accessCode,
     );
-    const guestUrl = `${this.configService.get<string>("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/guest/${token}`;
-    const qrAttachment = await this.createQrAttachment(checkInToken);
-    const payload = this.readTemplatePayload(job.templateType);
-    const values = this.buildTemplateValues(invitation, guestUrl, checkInToken);
-    const subject = this.renderTemplate(
-      payload.subject || "Einladung: {{event.title}}",
-      values,
-    );
-    const body = this.renderTemplate(
-      payload.body ||
-        [
-          "{{contact.personalSalutation}}",
-          "",
-          "Sie sind zum Event \"{{event.title}}\" eingeladen.",
-          "Ort: {{event.locationName}}",
-          "Start: {{event.startsAt}}",
-          "",
-          "Bitte antworten Sie hier: {{invitationUrl}}",
-        ].join("\n"),
-      values,
+    const { subject, body, invitationUrl, invitationCode } = this.buildInvitationContent(
+      invitation,
+      job.templateType,
+      accessCode,
     );
     const bodyWithFallback = [
       body,
       "",
-      "Am Eventtag kannst du den beigefuegten QR-Code vorzeigen.",
-      `Fallback-Code fuer den Check-in: ${checkInToken}`,
+      `Persoenlicher Einladungsbereich: ${invitationUrl}`,
+      `Code-Eingabe: ${this.getGuestCodeUrl()}`,
+      `Einladungscode zum Abtippen: ${this.formatInvitationCode(invitationCode)}`,
     ].join("\n");
 
     return transporter.sendMail({
@@ -247,11 +258,10 @@ export class MailService {
       text: bodyWithFallback,
       html: [
         this.textToHtml(body),
-        `<p><strong>QR-Check-in:</strong><br />Bitte diesen Code am Einlass vorzeigen.</p>`,
-        '<p><img src="cid:checkin-qr@eventmanager" alt="QR-Code fuer den Check-in" width="180" height="180" /></p>',
-        `<p><strong>Fallback-Code:</strong><br /><code>${this.escapeHtml(checkInToken)}</code></p>`,
+        `<p><strong>Persoenlicher Einladungsbereich:</strong><br /><a href="${this.escapeHtml(invitationUrl)}">${this.escapeHtml(invitationUrl)}</a></p>`,
+        `<p><strong>Code-Eingabe:</strong><br /><a href="${this.escapeHtml(this.getGuestCodeUrl())}">${this.escapeHtml(this.getGuestCodeUrl())}</a></p>`,
+        `<p><strong>Einladungscode zum Abtippen:</strong><br /><code>${this.escapeHtml(this.formatInvitationCode(invitationCode))}</code></p>`,
       ].join(""),
-      attachments: [qrAttachment],
     });
   }
 
@@ -345,10 +355,56 @@ export class MailService {
     }
   }
 
+  private buildInvitationContent(
+    invitation: InvitationForTemplate,
+    templateType: string | undefined,
+    invitationCode: string,
+  ) {
+    const token = this.guestTokenService.createInvitationToken(invitation.id);
+    const invitationUrl = `${this.configService.get<string>("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/guest/${token}`;
+    const invitationCodeUrl = this.getGuestCodeUrl();
+    const payload = this.readTemplatePayload(templateType ?? "INVITATION");
+    const values = this.buildTemplateValues(
+      invitation,
+      invitationUrl,
+      "",
+      invitationCode,
+      invitationCodeUrl,
+    );
+    const subject = this.renderTemplate(
+      payload.subject || "Einladung: {{event.title}}",
+      values,
+    );
+    const body = this.renderTemplate(
+      payload.body ||
+        [
+          "{{contact.personalSalutation}}",
+          "",
+          "Sie sind zum Event \"{{event.title}}\" eingeladen.",
+          "Ort: {{event.locationName}}",
+          "Start: {{event.startsAt}}",
+          "",
+          "Bitte antworten Sie hier: {{invitationUrl}}",
+        ].join("\n"),
+      values,
+    );
+
+    return {
+      subject,
+      body,
+      salutation: values["contact.personalSalutation"],
+      invitationUrl,
+      invitationCodeUrl,
+      invitationCode,
+    };
+  }
+
   private buildTemplateValues(
-    invitation: NonNullable<EmailJobWithRelations["invitation"]>,
+    invitation: InvitationForTemplate,
     invitationUrl: string,
     checkInToken: string,
+    invitationCode = "",
+    invitationCodeUrl = "",
   ) {
     const guestFields = this.readGuestFields(invitation.contact.notes);
     const contactCustomFields = this.flattenCustomFields(guestFields);
@@ -385,9 +441,55 @@ export class MailService {
         timeZone: invitation.event.timezone,
       }),
       invitationUrl,
+      invitationCodeUrl,
+      invitationCode,
       checkInToken,
       ...contactCustomFields,
     };
+  }
+
+  private async ensureInvitationAccessCode(invitationId: string, currentCode?: string | null) {
+    if (currentCode) {
+      return currentCode;
+    }
+
+    const accessCode = await this.createUniqueAccessCode();
+    await this.prisma.eventInvitation.update({
+      where: { id: invitationId },
+      data: { accessCode },
+    });
+
+    return accessCode;
+  }
+
+  private async createUniqueAccessCode() {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const bytes = randomBytes(8);
+      const code = Array.from(bytes)
+        .map((byte) => alphabet[byte % alphabet.length])
+        .join("")
+        .slice(0, 8);
+      const existing = await this.prisma.eventInvitation.findUnique({
+        where: { accessCode: code },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return code;
+      }
+    }
+
+    throw new Error("Could not generate invitation access code");
+  }
+
+  private formatInvitationCode(value: string) {
+    return value.length > 4 ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
+  }
+
+  private getGuestCodeUrl() {
+    return `${this.configService.get<string>("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/guest`;
   }
 
   private readGuestFields(notes: string | null): GuestFieldPayload {

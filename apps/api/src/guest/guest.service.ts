@@ -18,10 +18,16 @@ export class GuestService {
 
   async getInvitation(token: string) {
     const invitation = await this.findInvitationByToken(token);
+    const latestInvitationJob = invitation.emailJobs[0];
+    const invitationContent = await this.mailService.buildInvitationPageContent(
+      invitation,
+      latestInvitationJob?.templateType,
+    );
 
     return {
       id: invitation.id,
       status: invitation.status,
+      accessCode: invitationContent.invitationCode,
       contact: {
         firstName: invitation.contact.firstName,
         lastName: invitation.contact.lastName,
@@ -40,9 +46,35 @@ export class GuestService {
           invitation.event.allowCompanion === true ||
           this.decodeEventDescription(invitation.event.description).meta.allowCompanion === true,
       },
+      invitation: {
+        subject: invitationContent.subject,
+        salutation: invitationContent.salutation,
+        body: invitationContent.body,
+      },
       registration: invitation.registration
         ? this.presentRegistration(invitation.registration)
         : null,
+    };
+  }
+
+  async resolveInvitationCode(code: string) {
+    const normalizedCode = this.normalizeInvitationCode(code);
+
+    if (!normalizedCode) {
+      throw new BadRequestException("Einladungscode ist erforderlich");
+    }
+
+    const invitation = await this.prisma.eventInvitation.findUnique({
+      where: { accessCode: normalizedCode },
+      select: { id: true },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException("Einladungscode wurde nicht gefunden");
+    }
+
+    return {
+      token: this.guestTokenService.createInvitationToken(invitation.id),
     };
   }
 
@@ -171,6 +203,15 @@ export class GuestService {
         event: true,
         contact: true,
         registration: true,
+        emailJobs: {
+          where: {
+            templateType: {
+              startsWith: "INVITATION",
+            },
+          },
+          orderBy: [{ sentAt: "desc" }, { id: "desc" }],
+          take: 1,
+        },
       },
     });
 
@@ -179,6 +220,10 @@ export class GuestService {
     }
 
     return invitation;
+  }
+
+  private normalizeInvitationCode(value: string) {
+    return value.replace(/[^a-z0-9]/gi, "").toUpperCase();
   }
 
   private decodeEventDescription(description: string | null): {

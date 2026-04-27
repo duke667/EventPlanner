@@ -157,6 +157,7 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `event_id`
 - `contact_id`
 - `status`
+- `access_code`
 - `invite_token_hash`
 - `checkin_token_hash`
 - `invited_at`
@@ -349,7 +350,7 @@ Deployment-Ablauf:
 
 - Mailtemplates
 - Versandpipeline
-- Gastregistrierung per Token-Link
+- Gastregistrierung per Token-Link oder kurzem Einladungscode
 - Bestaetigungsmail mit ICS
 
 ### Phase 4: Eventtag

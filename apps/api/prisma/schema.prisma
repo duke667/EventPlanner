@@ -129,6 +129,7 @@ model EventInvitation {
   eventId         String             @map("event_id")
   contactId       String             @map("contact_id")
   status          InvitationStatus   @default(DRAFT)
+  accessCode      String?            @unique @map("access_code")
   inviteTokenHash String             @map("invite_token_hash")
   checkinTokenHash String?           @map("checkin_token_hash")
   invitedAt       DateTime?          @map("invited_at")

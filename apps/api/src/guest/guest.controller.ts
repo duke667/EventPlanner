@@ -7,6 +7,11 @@ import { GuestService } from "./guest.service";
 export class GuestController {
   constructor(private readonly guestService: GuestService) {}
 
+  @Get("code/:code")
+  resolveInvitationCode(@Param("code") code: string) {
+    return this.guestService.resolveInvitationCode(code);
+  }
+
   @Get("invitation/:token")
   getInvitation(@Param("token") token: string) {
     return this.guestService.getInvitation(token);

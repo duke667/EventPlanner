@@ -844,9 +844,35 @@ h3,
   color: var(--muted);
 }
 
+.guest-greeting {
+  background: #fff7f3;
+  border: 1px solid rgba(192, 0, 0, 0.16);
+  border-radius: 18px;
+  margin: 18px 0;
+  padding: 1.25rem;
+}
+
+.guest-greeting p {
+  color: var(--accent);
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0 0 0.75rem;
+}
+
+.guest-invitation-text {
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
 .guest-summary p,
 .guest-description {
   margin: 10px 0 0;
+}
+
+.guest-code-panel {
+  max-width: 720px;
 }
 
 .guest-form {

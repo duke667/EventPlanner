@@ -7,6 +7,7 @@ const API_PROXY_BASE = "/backend-api";
 type InvitationPayload = {
   id: string;
   status: string;
+  accessCode: string;
   contact: {
     firstName: string;
     lastName: string;
@@ -22,6 +23,11 @@ type InvitationPayload = {
     endsAt: string;
     timezone: string;
     allowCompanion: boolean;
+  };
+  invitation: {
+    subject: string;
+    salutation: string;
+    body: string;
   };
   registration: {
     response: "ACCEPTED" | "DECLINED";
@@ -188,6 +194,11 @@ export function GuestExperience({ token }: { token: string }) {
 
         {invitation ? (
           <>
+            <div className="guest-greeting">
+              <p>{invitation.invitation.salutation}</p>
+              <div className="guest-invitation-text">{invitation.invitation.body}</div>
+            </div>
+
             <div className="guest-summary">
               <p>
                 {invitation.contact.firstName} {invitation.contact.lastName}
@@ -203,6 +214,7 @@ export function GuestExperience({ token }: { token: string }) {
                   ? `, ${invitation.event.locationAddress}`
                   : ""}
               </p>
+              <p>Einladungscode: {invitation.accessCode}</p>
             </div>
 
             {invitation.event.description ? (
@@ -288,7 +300,7 @@ export function GuestExperience({ token }: { token: string }) {
               <div className="guest-ticket-box">
                 <p className="section-label">Dein Ticket</p>
                 <p>
-                  Nach deiner Zusage bekommst du eine E-Mail mit QR-Code fuer den
+                  Nach Ihrer Zusage bekommen Sie eine E-Mail mit QR-Code fuer den
                   Einlass und dem Kalendereintrag.
                 </p>
                 <div className="guest-ticket-actions">

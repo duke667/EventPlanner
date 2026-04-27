@@ -101,6 +101,10 @@ const initialInvitationTemplate: InvitationTemplateState = {
     "",
     "Bitte geben Sie uns ueber folgenden Link Rueckmeldung:",
     "{{invitationUrl}}",
+    "",
+    "Alternativ koennen Sie auf der Gastseite diesen Einladungscode eingeben:",
+    "{{invitationCodeUrl}}",
+    "{{invitationCode}}",
   ].join("\n"),
 };
 
@@ -117,6 +121,8 @@ const TEMPLATE_FIELDS = [
   { token: "event.startsAt", label: "Start" },
   { token: "event.locationName", label: "Ort" },
   { token: "invitationUrl", label: "Antwortlink" },
+  { token: "invitationCodeUrl", label: "Code-Seite" },
+  { token: "invitationCode", label: "Einladungscode" },
 ] as const;
 
 function formatDateTime(value: string) {

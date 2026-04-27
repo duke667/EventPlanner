@@ -44,6 +44,7 @@ export interface EventInvitationRecord {
   id: string;
   eventId: string;
   contactId: string;
+  accessCode?: string | null;
   status:
     | "DRAFT"
     | "SCHEDULED"

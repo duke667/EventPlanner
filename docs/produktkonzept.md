@@ -140,8 +140,8 @@ Statusmodell einer Einladung:
 ### 4.4 Einladung und Anmeldung
 
 - Mitarbeiter erstellt einen Einladungstext mit Serienbrief-Platzhaltern.
-- Gast erhaelt E-Mail mit persoenlichem Link und individualisiertem Text.
-- Gast landet auf einer schlanken Registrierungsseite.
+- Gast erhaelt E-Mail mit persoenlichem Link, kurzem Einladungscode und individualisiertem Text.
+- Gast landet per Link direkt auf seiner Registrierungsseite oder gibt den Einladungscode auf der Gastseite ein.
 - Gast bestaetigt Teilnahme oder sagt ab.
 - Wenn das Event Begleitung erlaubt, kann der Gast eine Begleitperson mit Vor- und Nachname angeben.
 - Fuer Begleitungen wird im aktuellen Stand keine separate Einladung erzeugt.
@@ -151,7 +151,7 @@ Statusmodell einer Einladung:
 
 - Nach Anmeldung versendet das System automatisch eine Bestaetigung.
 - Die Mail enthaelt eine ICS-Datei als Anhang.
-- Optional kann zusaetzlich ein QR-Code mitgesendet werden.
+- Zusaetzlich wird der QR-Code fuer den Einlass mitgesendet.
 
 ### 4.6 Check-in am Eventtag
 
