@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   UploadedFile,
   Patch,
@@ -29,7 +30,7 @@ export class ContactsController {
   ) {}
 
   @Get()
-  @Roles("ADMIN", "STAFF")
+  @Roles("ADMIN", "EVENT_PLANNER", "STAFF")
   findAll(
     @Query("query") query?: string,
     @CurrentUser() _user?: AuthenticatedUser,
@@ -38,20 +39,26 @@ export class ContactsController {
   }
 
   @Post()
-  @Roles("ADMIN", "STAFF")
+  @Roles("ADMIN", "EVENT_PLANNER", "STAFF")
   create(@Body() dto: CreateContactDto) {
     return this.contactsService.create(dto);
   }
 
   @Patch(":id")
-  @Roles("ADMIN", "STAFF")
+  @Roles("ADMIN", "EVENT_PLANNER", "STAFF")
   update(@Param("id") id: string, @Body() dto: UpdateContactDto) {
     return this.contactsService.update(id, dto);
   }
 
+  @Delete(":id")
+  @Roles("ADMIN", "EVENT_PLANNER", "STAFF")
+  delete(@Param("id") id: string) {
+    return this.contactsService.delete(id);
+  }
+
   @Post("import")
   @UseInterceptors(FileInterceptor("file"))
-  @Roles("ADMIN", "STAFF")
+  @Roles("ADMIN", "EVENT_PLANNER", "STAFF")
   importFile(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthenticatedUser,

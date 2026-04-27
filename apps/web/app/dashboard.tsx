@@ -50,6 +50,12 @@ type ContactFormState = {
   tags: string;
 };
 
+type RegisterFormState = {
+  email: string;
+  password: string;
+  role: UserRole;
+};
+
 type EventFormState = {
   title: string;
   description: string;
@@ -74,6 +80,12 @@ const initialContactForm: ContactFormState = {
   email: "",
   company: "",
   tags: "",
+};
+
+const initialRegisterForm: RegisterFormState = {
+  email: "",
+  password: "",
+  role: "EVENT_PLANNER",
 };
 
 const initialEventForm: EventFormState = {
@@ -178,11 +190,11 @@ function parseTags(value: string) {
 }
 
 function canManagePlanning(role?: UserRole) {
-  return role === "ADMIN" || role === "STAFF";
+  return role === "ADMIN" || role === "EVENT_PLANNER" || role === "STAFF";
 }
 
 function canCheckIn(role?: UserRole) {
-  return role === "ADMIN" || role === "STAFF" || role === "CHECK_IN";
+  return role === "ADMIN" || role === "EVENT_PLANNER" || role === "STAFF" || role === "CHECK_IN";
 }
 
 async function apiRequest<T>(
@@ -214,6 +226,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [attendees, setAttendees] = useState<EventInvitationRecord[]>([]);
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("ChangeMe123!");
+  const [registerForm, setRegisterForm] = useState<RegisterFormState>(initialRegisterForm);
   const [query, setQuery] = useState("");
   const [checkInQuery, setCheckInQuery] = useState("");
   const [qrToken, setQrToken] = useState("");
@@ -222,6 +235,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [contactForm, setContactForm] =
+    useState<ContactFormState>(initialContactForm);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [editContactForm, setEditContactForm] =
     useState<ContactFormState>(initialContactForm);
   const [importResult, setImportResult] = useState<ContactImportResult | null>(null);
   const [eventForm, setEventForm] = useState<EventFormState>(initialEventForm);
@@ -237,6 +253,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [scannerSupported, setScannerSupported] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isSubmittingContact, startContactTransition] = useTransition();
+  const [isRegistering, startRegisterTransition] = useTransition();
   const [isImportingContacts, startImportTransition] = useTransition();
   const [isImportingGuests, startGuestImportTransition] = useTransition();
   const [isSubmittingEvent, startEventTransition] = useTransition();
@@ -504,6 +521,28 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     });
   }
 
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError(null);
+
+    startRegisterTransition(() => {
+      apiRequest<LoginResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(registerForm),
+      })
+        .then((result) => {
+          setSession(result);
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
+          setEmail(registerForm.email);
+          setPassword("");
+          setRegisterForm(initialRegisterForm);
+        })
+        .catch((error: Error) => {
+          setAuthError(error.message);
+        });
+    });
+  }
+
   async function handleCreateContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -538,6 +577,111 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
             ),
           );
           setContactForm(initialContactForm);
+        })
+        .catch((error: Error) => {
+          setContactError(error.message);
+        });
+    });
+  }
+
+  function beginEditContact(contact: Contact) {
+    setEditingContactId(contact.id);
+    setEditContactForm({
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      email: contact.email,
+      company: contact.company ?? "",
+      tags: contact.tags.join(", "),
+    });
+  }
+
+  function handleUpdateContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!session?.accessToken || !editingContactId) {
+      return;
+    }
+
+    setContactError(null);
+
+    startContactTransition(() => {
+      apiRequest<Contact>(
+        `/contacts/${editingContactId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            firstName: editContactForm.firstName,
+            lastName: editContactForm.lastName,
+            email: editContactForm.email,
+            company: editContactForm.company || undefined,
+            tags: parseTags(editContactForm.tags),
+          }),
+        },
+        session.accessToken,
+      )
+        .then((updated) => {
+          setContacts((current) =>
+            current.map((contact) => (contact.id === updated.id ? updated : contact)),
+          );
+          setEditingContactId(null);
+          setEditContactForm(initialContactForm);
+        })
+        .catch((error: Error) => {
+          setContactError(error.message);
+        });
+    });
+  }
+
+  function handleDeleteContact(contact: Contact) {
+    if (!session?.accessToken) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${contact.firstName} ${contact.lastName} wirklich loeschen? Zugehoerige Einladungen, Antworten und Check-ins werden ebenfalls entfernt.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setContactError(null);
+
+    startContactTransition(() => {
+      apiRequest<{ ok: boolean }>(
+        `/contacts/${contact.id}`,
+        {
+          method: "DELETE",
+        },
+        session.accessToken,
+      )
+        .then(() => {
+          const removedFromSelectedEvent = attendees.some(
+            (invitation) => invitation.contactId === contact.id,
+          );
+          setContacts((current) => current.filter((item) => item.id !== contact.id));
+          setAttendees((current) =>
+            current.filter((invitation) => invitation.contactId !== contact.id),
+          );
+          setEvents((current) =>
+            current.map((event) =>
+              event.id === selectedEventId
+                ? {
+                    ...event,
+                    _count: {
+                      invitations: removedFromSelectedEvent
+                        ? Math.max(0, event._count.invitations - 1)
+                        : event._count.invitations,
+                    },
+                  }
+                : event,
+            ),
+          );
+          setSelectedContactIds((current) => current.filter((id) => id !== contact.id));
+          if (editingContactId === contact.id) {
+            setEditingContactId(null);
+            setEditContactForm(initialContactForm);
+          }
         })
         .catch((error: Error) => {
           setContactError(error.message);
@@ -1153,6 +1297,68 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
           {authError ? <p className="error-box">{authError}</p> : null}
 
+          {!session ? (
+            <form className="stack register-box" onSubmit={handleRegister}>
+              <div>
+                <p className="section-label">Neu anmelden</p>
+                <h3>Konto erstellen</h3>
+              </div>
+
+              <label className="field">
+                <span>E-Mail</span>
+                <input
+                  autoComplete="email"
+                  onChange={(event) =>
+                    setRegisterForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  type="email"
+                  value={registerForm.email}
+                />
+              </label>
+
+              <label className="field">
+                <span>Passwort</span>
+                <input
+                  autoComplete="new-password"
+                  minLength={8}
+                  onChange={(event) =>
+                    setRegisterForm((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
+                  }
+                  type="password"
+                  value={registerForm.password}
+                />
+              </label>
+
+              <label className="field">
+                <span>Rolle</span>
+                <select
+                  className="select-input"
+                  onChange={(event) =>
+                    setRegisterForm((current) => ({
+                      ...current,
+                      role: event.target.value as UserRole,
+                    }))
+                  }
+                  value={registerForm.role}
+                >
+                  <option value="EVENT_PLANNER">Event Planer</option>
+                  <option value="CHECK_IN">Check-in</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </label>
+
+              <button className="ghost-button" disabled={isRegistering} type="submit">
+                {isRegistering ? "Konto wird erstellt..." : "Registrieren"}
+              </button>
+            </form>
+          ) : null}
+
           {session ? (
             <div className="identity-card">
               <p className="section-label">Aktive Session</p>
@@ -1384,25 +1590,129 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                   ) : (
                     contacts.map((contact) => (
                       <article className="contact-card" key={contact.id}>
-                        <div className="contact-card-head">
-                          <div>
-                            <h3>
-                              {contact.firstName} {contact.lastName}
-                            </h3>
-                            <p>{contact.company ?? "Ohne Firma"}</p>
-                          </div>
-                          <a href={`mailto:${contact.email}`}>{contact.email}</a>
-                        </div>
+                        {editingContactId === contact.id ? (
+                          <form className="contact-edit-form" onSubmit={handleUpdateContact}>
+                            <label className="field">
+                              <span>Vorname</span>
+                              <input
+                                onChange={(event) =>
+                                  setEditContactForm((current) => ({
+                                    ...current,
+                                    firstName: event.target.value,
+                                  }))
+                                }
+                                value={editContactForm.firstName}
+                              />
+                            </label>
+                            <label className="field">
+                              <span>Nachname</span>
+                              <input
+                                onChange={(event) =>
+                                  setEditContactForm((current) => ({
+                                    ...current,
+                                    lastName: event.target.value,
+                                  }))
+                                }
+                                value={editContactForm.lastName}
+                              />
+                            </label>
+                            <label className="field">
+                              <span>E-Mail</span>
+                              <input
+                                onChange={(event) =>
+                                  setEditContactForm((current) => ({
+                                    ...current,
+                                    email: event.target.value,
+                                  }))
+                                }
+                                type="email"
+                                value={editContactForm.email}
+                              />
+                            </label>
+                            <label className="field">
+                              <span>Firma</span>
+                              <input
+                                onChange={(event) =>
+                                  setEditContactForm((current) => ({
+                                    ...current,
+                                    company: event.target.value,
+                                  }))
+                                }
+                                value={editContactForm.company}
+                              />
+                            </label>
+                            <label className="field field-wide">
+                              <span>Tags</span>
+                              <input
+                                onChange={(event) =>
+                                  setEditContactForm((current) => ({
+                                    ...current,
+                                    tags: event.target.value,
+                                  }))
+                                }
+                                value={editContactForm.tags}
+                              />
+                            </label>
+                            <div className="button-row field-wide">
+                              <button
+                                className="primary-button"
+                                disabled={isSubmittingContact}
+                                type="submit"
+                              >
+                                Speichern
+                              </button>
+                              <button
+                                className="ghost-button"
+                                onClick={() => {
+                                  setEditingContactId(null);
+                                  setEditContactForm(initialContactForm);
+                                }}
+                                type="button"
+                              >
+                                Abbrechen
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            <div className="contact-card-head">
+                              <div>
+                                <h3>
+                                  {contact.firstName} {contact.lastName}
+                                </h3>
+                                <p>{contact.company ?? "Ohne Firma"}</p>
+                              </div>
+                              <a href={`mailto:${contact.email}`}>{contact.email}</a>
+                            </div>
 
-                        {contact.tags.length > 0 ? (
-                          <div className="tag-row">
-                            {contact.tags.map((tag) => (
-                              <span className="tag" key={tag}>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
+                            {contact.tags.length > 0 ? (
+                              <div className="tag-row">
+                                {contact.tags.map((tag) => (
+                                  <span className="tag" key={tag}>
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="button-row">
+                              <button
+                                className="ghost-button"
+                                onClick={() => beginEditContact(contact)}
+                                type="button"
+                              >
+                                Bearbeiten
+                              </button>
+                              <button
+                                className="danger-button"
+                                onClick={() => handleDeleteContact(contact)}
+                                type="button"
+                              >
+                                Loeschen
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </article>
                     ))
                   )}

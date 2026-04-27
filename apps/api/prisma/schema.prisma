@@ -10,6 +10,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  EVENT_PLANNER
   STAFF
   CHECK_IN
 }

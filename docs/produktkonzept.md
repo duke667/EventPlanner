@@ -17,6 +17,7 @@ Kernnutzen:
 Der erste sinnvolle MVP sollte folgende Faehigkeiten enthalten:
 
 - Login fuer Mitarbeiter
+- einfache Selbstregistrierung mit Rollenauswahl als Uebergangsloesung
 - Kontaktverwaltung
 - Kontaktimport per Excel oder CSV
 - Eventverwaltung
@@ -55,6 +56,12 @@ Nicht im ersten MVP:
 - Live-Kennzahlen der Veranstaltung einsehen
 - Check-in am Eventtag durchfuehren
 
+### Event Planer
+
+- Events, Kontakte, Gaestelisten und Einladungen verwalten
+- Live-Dashboard einsehen
+- Check-in unterstuetzen
+
 ### Gast
 
 - Einladung per E-Mail erhalten
@@ -68,6 +75,7 @@ Nicht im ersten MVP:
 Kann im MVP mit der Mitarbeiterrolle zusammenfallen. Spaeter zusaetzlich:
 
 - Benutzerverwaltung
+- Freischaltung neuer Benutzer und Rollenvergabe
 - Systemeinstellungen
 - Mail-Templates
 - Importregeln
@@ -77,6 +85,8 @@ Kann im MVP mit der Mitarbeiterrolle zusammenfallen. Spaeter zusaetzlich:
 ### 4.1 Kontaktpflege
 
 - Mitarbeiter legt einzelne Kontakte an oder importiert eine Datei.
+- Kontakte koennen im Backoffice bearbeitet und geloescht werden.
+- Beim Loeschen eines Kontakts werden zugehoerige Einladungen, Antworten und Check-ins entfernt.
 - Importdatei wird validiert und einer internen Feldstruktur zugeordnet.
 - Duplikate werden markiert, nicht stillschweigend ueberschrieben.
 

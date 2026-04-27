@@ -100,6 +100,9 @@ Fuer den MVP reichen zunaechst diese Tabellen:
 - `created_at`
 - `updated_at`
 
+Aktuelle Rollen: `ADMIN`, `EVENT_PLANNER`, `STAFF` als Legacy-Planungsrolle und `CHECK_IN`.
+Die Selbstregistrierung ist vorerst offen; spaeter sollte ein Admin neue Benutzer freischalten und Rollen vergeben.
+
 ### `contacts`
 
 - `id`
@@ -342,6 +345,7 @@ Deployment-Ablauf:
 ### Phase 2: Kontakte und Events
 
 - Kontaktverwaltung
+- Kontakte bearbeiten und loeschen
 - CSV/XLSX-Import
 - Eventverwaltung
 - Einladungslisten

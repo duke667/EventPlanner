@@ -90,7 +90,7 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
-  role: "ADMIN" | "STAFF" | "CHECK_IN";
+  role: "ADMIN" | "EVENT_PLANNER" | "STAFF" | "CHECK_IN";
 }
 
 export interface LoginResponse {

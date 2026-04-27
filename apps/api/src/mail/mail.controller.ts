@@ -10,7 +10,7 @@ export class MailController {
   constructor(private readonly mailService: MailService) {}
 
   @Post("process-email-queue")
-  @Roles("ADMIN", "STAFF")
+  @Roles("ADMIN", "EVENT_PLANNER", "STAFF")
   processQueue() {
     return this.mailService.processQueue();
   }

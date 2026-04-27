@@ -5,7 +5,8 @@ Event-Management-Tool fuer interne Mitarbeiter zur Planung, Einladung, Anmeldung
 ## Aktueller Funktionsstand
 
 - Backoffice mit Login, Rollenlogik und getrennten Bereichen fuer Uebersicht, Kontakte, Events, Einladungen, Live-Dashboard und Check-in
-- Kontaktverwaltung mit manuellem Anlegen und CSV/XLSX-Import
+- offene Registrierung mit Rollenauswahl fuer Admin, Event Planer und Check-in
+- Kontaktverwaltung mit manuellem Anlegen, Bearbeiten, Loeschen und CSV/XLSX-Import
 - Event-Erstellung inklusive Kapazitaet, Status und Option "Begleitung erlaubt"
 - Gaestelistenimport direkt fuer ein Event aus CSV/XLSX, inklusive spezieller Excel-Spalten fuer Anrede und Serienbrief-Felder
 - Einladungslisten pro Event aus Kontakten oder importierter Gaesteliste

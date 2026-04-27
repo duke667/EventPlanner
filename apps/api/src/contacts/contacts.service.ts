@@ -65,4 +65,44 @@ export class ContactsService {
       },
     });
   }
+
+  async delete(id: string) {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!contact) {
+      throw new NotFoundException("Contact not found");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const invitations = await tx.eventInvitation.findMany({
+        where: { contactId: id },
+        select: { id: true },
+      });
+      const invitationIds = invitations.map((invitation) => invitation.id);
+
+      if (invitationIds.length > 0) {
+        await tx.emailJob.deleteMany({
+          where: { eventInvitationId: { in: invitationIds } },
+        });
+        await tx.checkIn.deleteMany({
+          where: { eventInvitationId: { in: invitationIds } },
+        });
+        await tx.eventRegistration.deleteMany({
+          where: { eventInvitationId: { in: invitationIds } },
+        });
+        await tx.eventInvitation.deleteMany({
+          where: { id: { in: invitationIds } },
+        });
+      }
+
+      await tx.contact.delete({
+        where: { id },
+      });
+    });
+
+    return { ok: true };
+  }
 }
