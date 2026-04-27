@@ -8,6 +8,7 @@ Event-Management-Tool fuer interne Mitarbeiter zur Planung, Einladung, Anmeldung
 - offene Registrierung mit Rollenauswahl fuer Admin, Event Planer und Check-in
 - Kontaktverwaltung mit manuellem Anlegen, Bearbeiten, Loeschen und CSV/XLSX-Import
 - Event-Erstellung inklusive Kapazitaet, Status und Option "Begleitung erlaubt"
+- Gastseiten-Vorlage je Event mit eigenem Seitentitel, Einleitung, Zusatzinformation und Antworttexten
 - Gaestelistenimport direkt fuer ein Event aus CSV/XLSX, inklusive spezieller Excel-Spalten fuer Anrede und Serienbrief-Felder
 - Einladungslisten pro Event aus Kontakten oder importierter Gaesteliste
 - frei editierbarer Einladungstext mit Platzhaltern wie `{{contact.personalSalutation}}`, `{{event.title}}`, `{{custom.amt}}`, `{{invitationUrl}}` und `{{invitationCode}}`

@@ -59,6 +59,11 @@ type RegisterFormState = {
 type EventFormState = {
   title: string;
   description: string;
+  guestPageTitle: string;
+  guestPageIntro: string;
+  guestPageInfo: string;
+  guestAcceptLabel: string;
+  guestDeclineLabel: string;
   locationName: string;
   locationAddress: string;
   startsAt: string;
@@ -91,6 +96,11 @@ const initialRegisterForm: RegisterFormState = {
 const initialEventForm: EventFormState = {
   title: "",
   description: "",
+  guestPageTitle: "",
+  guestPageIntro: "",
+  guestPageInfo: "",
+  guestAcceptLabel: "Ich nehme teil",
+  guestDeclineLabel: "Ich sage ab",
   locationName: "",
   locationAddress: "",
   startsAt: "",
@@ -838,6 +848,11 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
           body: JSON.stringify({
             title: eventForm.title,
             description: eventForm.description || undefined,
+            guestPageTitle: eventForm.guestPageTitle || undefined,
+            guestPageIntro: eventForm.guestPageIntro || undefined,
+            guestPageInfo: eventForm.guestPageInfo || undefined,
+            guestAcceptLabel: eventForm.guestAcceptLabel || undefined,
+            guestDeclineLabel: eventForm.guestDeclineLabel || undefined,
             locationName: eventForm.locationName,
             locationAddress: eventForm.locationAddress || undefined,
             startsAt: new Date(eventForm.startsAt).toISOString(),
@@ -1768,6 +1783,92 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                       value={eventForm.description}
                     />
                   </label>
+
+                  <div className="template-panel field-wide">
+                    <div className="panel-head compact-head">
+                      <div>
+                        <p className="section-label">Gastseite</p>
+                        <h3>Vorlage fuer eingeladene Gaeste</h3>
+                      </div>
+                    </div>
+                    <p className="template-help">
+                      Diese Texte erscheinen auf der persoenlichen Anmeldeseite. Wenn
+                      die Einleitung leer bleibt, wird der Einladungstext aus dem
+                      Mailversand verwendet.
+                    </p>
+
+                    <label className="field field-wide">
+                      <span>Seitentitel</span>
+                      <input
+                        onChange={(event) =>
+                          setEventForm((current) => ({
+                            ...current,
+                            guestPageTitle: event.target.value,
+                          }))
+                        }
+                        placeholder="z. B. Ihre Einladung zum Stadtgeburtstag"
+                        value={eventForm.guestPageTitle}
+                      />
+                    </label>
+
+                    <label className="field field-wide">
+                      <span>Einleitung auf der Gastseite</span>
+                      <textarea
+                        className="textarea-input"
+                        onChange={(event) =>
+                          setEventForm((current) => ({
+                            ...current,
+                            guestPageIntro: event.target.value,
+                          }))
+                        }
+                        placeholder="Text, der nach der persoenlichen Anrede angezeigt wird."
+                        rows={5}
+                        value={eventForm.guestPageIntro}
+                      />
+                    </label>
+
+                    <label className="field field-wide">
+                      <span>Zusatzinformation</span>
+                      <textarea
+                        className="textarea-input"
+                        onChange={(event) =>
+                          setEventForm((current) => ({
+                            ...current,
+                            guestPageInfo: event.target.value,
+                          }))
+                        }
+                        placeholder="z. B. Hinweise zu Einlass, Parken oder Garderobe."
+                        rows={3}
+                        value={eventForm.guestPageInfo}
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Text fuer Zusage</span>
+                      <input
+                        onChange={(event) =>
+                          setEventForm((current) => ({
+                            ...current,
+                            guestAcceptLabel: event.target.value,
+                          }))
+                        }
+                        value={eventForm.guestAcceptLabel}
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Text fuer Absage</span>
+                      <input
+                        onChange={(event) =>
+                          setEventForm((current) => ({
+                            ...current,
+                            guestDeclineLabel: event.target.value,
+                          }))
+                        }
+                        value={eventForm.guestDeclineLabel}
+                      />
+                    </label>
+                  </div>
 
                   <label className="field">
                     <span>Location</span>

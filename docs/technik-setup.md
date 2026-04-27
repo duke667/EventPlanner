@@ -142,6 +142,11 @@ Die Selbstregistrierung ist vorerst offen; spaeter sollte ein Admin neue Benutze
 - `title`
 - `slug`
 - `description`
+- `guest_page_title`
+- `guest_page_intro`
+- `guest_page_info`
+- `guest_accept_label`
+- `guest_decline_label`
 - `location_name`
 - `location_address`
 - `starts_at`

@@ -27,7 +27,11 @@ type InvitationPayload = {
   invitation: {
     subject: string;
     salutation: string;
+    title: string;
     body: string;
+    info: string | null;
+    acceptLabel: string;
+    declineLabel: string;
   };
   registration: {
     response: "ACCEPTED" | "DECLINED";
@@ -189,7 +193,7 @@ export function GuestExperience({ token }: { token: string }) {
     <main className="guest-shell">
       <section className="guest-panel">
         <p className="eyebrow">Einladung</p>
-        <h1>{invitation?.event.title ?? "Event wird geladen"}</h1>
+        <h1>{invitation?.invitation.title ?? invitation?.event.title ?? "Event wird geladen"}</h1>
         {error ? <p className="error-box">{error}</p> : null}
 
         {invitation ? (
@@ -221,6 +225,10 @@ export function GuestExperience({ token }: { token: string }) {
               <p className="guest-description">{invitation.event.description}</p>
             ) : null}
 
+            {invitation.invitation.info ? (
+              <div className="guest-info-box">{invitation.invitation.info}</div>
+            ) : null}
+
             <form className="guest-form" onSubmit={handleSubmit}>
               <label className="field field-wide">
                 <span>Antwort</span>
@@ -231,8 +239,8 @@ export function GuestExperience({ token }: { token: string }) {
                   }
                   value={response}
                 >
-                  <option value="ACCEPTED">Ich nehme teil</option>
-                  <option value="DECLINED">Ich sage ab</option>
+                  <option value="ACCEPTED">{invitation.invitation.acceptLabel}</option>
+                  <option value="DECLINED">{invitation.invitation.declineLabel}</option>
                 </select>
               </label>
 

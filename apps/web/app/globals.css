@@ -891,6 +891,17 @@ h3,
   white-space: pre-line;
 }
 
+.guest-info-box {
+  background: rgba(70, 120, 160, 0.1);
+  border: 1px solid rgba(70, 120, 160, 0.18);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  line-height: 1.6;
+  margin-top: 18px;
+  padding: 16px;
+  white-space: pre-line;
+}
+
 .guest-summary p,
 .guest-description {
   margin: 10px 0 0;

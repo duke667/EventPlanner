@@ -21,6 +21,7 @@ Der erste sinnvolle MVP sollte folgende Faehigkeiten enthalten:
 - Kontaktverwaltung
 - Kontaktimport per Excel oder CSV
 - Eventverwaltung
+- Gastseiten-Vorlage je Event
 - optionale Begleitperson pro Event
 - Einladungslisten pro Event
 - Versand von personalisierten Einladungsmails mit Serienbrief-Platzhaltern
@@ -126,6 +127,7 @@ Ein Event benoetigt mindestens:
 - Ansprechpartner
 - Status `draft`, `published`, `closed`, `archived`
 - Option, ob die Einladung nur persoenlich gilt oder ob eine Begleitung erlaubt ist
+- Gastseiten-Titel, Einleitungstext, Zusatzinformation und Beschriftungen fuer Zusage/Absage
 
 ### 4.3 Einladungsliste erzeugen
 
@@ -152,6 +154,7 @@ Statusmodell einer Einladung:
 - Mitarbeiter erstellt einen Einladungstext mit Serienbrief-Platzhaltern.
 - Gast erhaelt E-Mail mit persoenlichem Link, kurzem Einladungscode und individualisiertem Text.
 - Gast landet per Link direkt auf seiner Registrierungsseite oder gibt den Einladungscode auf der Gastseite ein.
+- Die Registrierungsseite nutzt die fuer das Event konfigurierte Gastseiten-Vorlage; falls keine Einleitung gepflegt ist, wird der Einladungstext verwendet.
 - Gast bestaetigt Teilnahme oder sagt ab.
 - Wenn das Event Begleitung erlaubt, kann der Gast eine Begleitperson mit Vor- und Nachname angeben.
 - Fuer Begleitungen wird im aktuellen Stand keine separate Einladung erzeugt.

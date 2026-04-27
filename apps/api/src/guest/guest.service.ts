@@ -49,7 +49,11 @@ export class GuestService {
       invitation: {
         subject: invitationContent.subject,
         salutation: invitationContent.salutation,
-        body: invitationContent.body,
+        title: invitation.event.guestPageTitle || invitation.event.title,
+        body: invitation.event.guestPageIntro || invitationContent.body,
+        info: invitation.event.guestPageInfo,
+        acceptLabel: invitation.event.guestAcceptLabel || "Ich nehme teil",
+        declineLabel: invitation.event.guestDeclineLabel || "Ich sage ab",
       },
       registration: invitation.registration
         ? this.presentRegistration(invitation.registration)

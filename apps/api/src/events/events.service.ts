@@ -100,6 +100,11 @@ export class EventsService {
         title: dto.title,
         slug,
         description: dto.description,
+        guestPageTitle: dto.guestPageTitle,
+        guestPageIntro: dto.guestPageIntro,
+        guestPageInfo: dto.guestPageInfo,
+        guestAcceptLabel: dto.guestAcceptLabel,
+        guestDeclineLabel: dto.guestDeclineLabel,
         locationName: dto.locationName,
         locationAddress: dto.locationAddress,
         startsAt,
@@ -151,6 +156,11 @@ export class EventsService {
           dto.description !== undefined
             ? dto.description
             : this.decodeEventDescription(existing.description).description,
+        guestPageTitle: dto.guestPageTitle,
+        guestPageIntro: dto.guestPageIntro,
+        guestPageInfo: dto.guestPageInfo,
+        guestAcceptLabel: dto.guestAcceptLabel,
+        guestDeclineLabel: dto.guestDeclineLabel,
         locationName: dto.locationName,
         locationAddress: dto.locationAddress,
         startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,

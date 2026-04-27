@@ -24,6 +24,11 @@ export interface EventRecord {
   title: string;
   slug: string;
   description: string | null;
+  guestPageTitle: string | null;
+  guestPageIntro: string | null;
+  guestPageInfo: string | null;
+  guestAcceptLabel: string | null;
+  guestDeclineLabel: string | null;
   locationName: string;
   locationAddress: string | null;
   startsAt: string;
