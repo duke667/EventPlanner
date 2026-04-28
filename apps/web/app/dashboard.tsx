@@ -260,6 +260,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [invitationError, setInvitationError] = useState<string | null>(null);
   const [invitationSuccess, setInvitationSuccess] = useState<string | null>(null);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [scannerHint, setScannerHint] = useState<string | null>(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [scannerSupported, setScannerSupported] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -296,11 +297,28 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       return;
     }
 
+    if (!window.isSecureContext) {
+      setScannerHint(
+        "Kamera- und QR-Scan funktionieren nur ueber HTTPS oder auf localhost. Bitte die Backoffice-URL entsprechend aufrufen.",
+      );
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScannerHint(
+        "Dieser Browser blockiert den Kamera-Zugriff. Bitte auf Safari/Chrome in aktueller Version wechseln.",
+      );
+      return;
+    }
+
     const BarcodeDetectorApi = (window as Window & {
       BarcodeDetector?: BarcodeDetectorConstructor;
     }).BarcodeDetector;
 
     if (!BarcodeDetectorApi) {
+      setScannerHint(
+        "Safari auf iOS unterstuetzt den nativen QR-Detector nicht durchgaengig. Bitte QR-Token manuell einfuellen oder einen Browser mit BarcodeDetector verwenden.",
+      );
       return;
     }
 
@@ -308,6 +326,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       formats: ["qr_code"],
     });
     setScannerSupported(true);
+    setScannerHint(null);
   }, []);
 
   useEffect(() => {
@@ -1231,7 +1250,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
 
   async function startQrScanner() {
     if (!scannerSupported) {
-      setScannerError("Dieser Browser unterstuetzt keinen nativen QR-Scan.");
+      setScannerError(
+        scannerHint ?? "Dieser Browser unterstuetzt keinen nativen QR-Scan.",
+      );
       return;
     }
 
@@ -2603,8 +2624,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                           </div>
                         ) : (
                           <p className="empty-state">
-                            Dieser Browser bietet keinen nativen QR-Scan. Nutze in diesem Fall
-                            die manuelle Eingabe.
+                            {scannerHint ??
+                              "Dieser Browser bietet keinen nativen QR-Scan. Nutze in diesem Fall die manuelle Eingabe."}
                           </p>
                         )}
 
