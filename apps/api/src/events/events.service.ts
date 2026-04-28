@@ -538,14 +538,24 @@ export class EventsService {
       throw new NotFoundException("Invitation not found for event");
     }
 
+    const lastCheckIn = await this.prisma.checkIn.findFirst({
+      where: { eventInvitationId: invitation.id },
+      orderBy: { checkedInAt: "desc" },
+    });
+
     const allowedStatuses = new Set<InvitationStatus>([
       InvitationStatus.SENT,
       InvitationStatus.REGISTERED,
-      InvitationStatus.CHECKED_IN,
     ]);
 
     if (!allowedStatuses.has(invitation.status)) {
       throw new BadRequestException("Invitation is not eligible for check-in");
+    }
+
+    if (lastCheckIn) {
+      throw new ConflictException(
+        `Guest already checked in at ${lastCheckIn.checkedInAt.toISOString()}`,
+      );
     }
 
     const checkIn = await this.prisma.checkIn.create({

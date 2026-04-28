@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  ChangeEvent,
   FormEvent,
   useDeferredValue,
   useEffect,
@@ -17,6 +18,7 @@ import type {
   EventRecord,
   LoginResponse,
 } from "@event-manager/types";
+import type QrScanner from "qr-scanner";
 
 const STORAGE_KEY = "event-manager-session";
 const API_PROXY_BASE = "/backend-api";
@@ -32,13 +34,12 @@ const BACKOFFICE_SECTIONS = [
 
 export type BackofficeSection = (typeof BACKOFFICE_SECTIONS)[number]["id"];
 type UserRole = LoginResponse["user"]["role"];
-type DetectedBarcode = { rawValue?: string };
-type BarcodeDetectorLike = {
-  detect: (source: HTMLVideoElement) => Promise<DetectedBarcode[]>;
+type QrScannerModule = typeof import("qr-scanner");
+type QrScannerInstance = InstanceType<typeof QrScanner>;
+type QrScannerResult = {
+  data: string;
+  cornerPoints: Array<{ x: number; y: number }>;
 };
-type BarcodeDetectorConstructor = new (options: {
-  formats: string[];
-}) => BarcodeDetectorLike;
 
 type SessionState = LoginResponse | null;
 
@@ -77,6 +78,12 @@ type EventFormState = {
 type InvitationTemplateState = {
   subject: string;
   body: string;
+};
+
+type CheckInNotice = {
+  tone: "success" | "warning";
+  title: string;
+  detail: string;
 };
 
 const initialContactForm: ContactFormState = {
@@ -199,6 +206,37 @@ function parseTags(value: string) {
     .filter(Boolean);
 }
 
+function formatCheckInTimestamp(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function buildCheckInNotice(invitation: EventInvitationRecord): CheckInNotice {
+  const lastCheckInAt = formatCheckInTimestamp(invitation.checkIns?.[0]?.checkedInAt);
+
+  if (invitation.status === "CHECKED_IN") {
+    return {
+      tone: "warning",
+      title: "Gast ist bereits eingecheckt",
+      detail: lastCheckInAt
+        ? `Letzter Check-in: ${lastCheckInAt}. Bitte nur erneut bestaetigen, wenn der Einlass wirklich korrigiert werden muss.`
+        : "Fuer diesen Gast existiert bereits ein Check-in. Bitte Mehrfacherfassungen vermeiden.",
+    };
+  }
+
+  return {
+    tone: "success",
+    title: "Scan bereit zur Bestaetigung",
+    detail: "Daten kurz pruefen und den Check-in danach final bestaetigen.",
+  };
+}
+
 function canManagePlanning(role?: UserRole) {
   return role === "ADMIN" || role === "EVENT_PLANNER" || role === "STAFF";
 }
@@ -261,6 +299,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [invitationSuccess, setInvitationSuccess] = useState<string | null>(null);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerHint, setScannerHint] = useState<string | null>(null);
+  const [checkInError, setCheckInError] = useState<string | null>(null);
+  const [checkInNotice, setCheckInNotice] = useState<CheckInNotice | null>(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [scannerSupported, setScannerSupported] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -272,10 +312,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   const [isSubmittingInvitations, startInvitationTransition] = useTransition();
   const deferredQuery = useDeferredValue(query);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const qrStreamRef = useRef<MediaStream | null>(null);
-  const qrDetectorRef = useRef<BarcodeDetectorLike | null>(null);
-  const qrFrameRef = useRef<number | null>(null);
-  const qrBusyRef = useRef(false);
+  const qrFileInputRef = useRef<HTMLInputElement | null>(null);
+  const qrScannerModuleRef = useRef<QrScannerModule | null>(null);
+  const qrScannerRef = useRef<QrScannerInstance | null>(null);
   const currentRole = session?.user.role;
   const visibleSections = BACKOFFICE_SECTIONS.filter((entry) => {
     if (entry.id === "overview") {
@@ -311,22 +350,42 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       return;
     }
 
-    const BarcodeDetectorApi = (window as Window & {
-      BarcodeDetector?: BarcodeDetectorConstructor;
-    }).BarcodeDetector;
+    let active = true;
 
-    if (!BarcodeDetectorApi) {
-      setScannerHint(
-        "Safari auf iOS unterstuetzt den nativen QR-Detector nicht durchgaengig. Bitte QR-Token manuell einfuellen oder einen Browser mit BarcodeDetector verwenden.",
-      );
-      return;
-    }
+    import("qr-scanner")
+      .then(async (module) => {
+        if (!active) {
+          return;
+        }
 
-    qrDetectorRef.current = new BarcodeDetectorApi({
-      formats: ["qr_code"],
-    });
-    setScannerSupported(true);
-    setScannerHint(null);
+        qrScannerModuleRef.current = module;
+        const hasCamera = await module.default.hasCamera().catch(() => false);
+
+        if (!active) {
+          return;
+        }
+
+        setScannerSupported(hasCamera);
+        setScannerHint(
+          hasCamera
+            ? "Auf iPhone und iPad kann der Scan je nach WebKit-Version stabiler ueber die Kamera oder alternativ ueber ein direkt aufgenommenes Foto laufen."
+            : "Auf diesem Geraet wurde keine nutzbare Kamera erkannt. Bitte QR-Token manuell eingeben oder ein Foto des QR-Codes aufnehmen.",
+        );
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        setScannerSupported(false);
+        setScannerHint(
+          "Der QR-Scanner konnte nicht geladen werden. Bitte QR-Token manuell eingeben oder ein Foto des QR-Codes aufnehmen.",
+        );
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -386,6 +445,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   useEffect(() => {
     if (!session?.accessToken || !selectedEventId) {
       setAttendees([]);
+      setCheckInPreview(null);
+      setCheckInError(null);
+      setCheckInNotice(null);
       return;
     }
 
@@ -400,12 +462,12 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         .then((items) => {
           if (active) {
             setAttendees(items);
-            setInvitationError(null);
+            setCheckInError(null);
           }
         })
         .catch((error: Error) => {
           if (active) {
-            setInvitationError(error.message);
+            setCheckInError(error.message);
           }
         });
     });
@@ -418,6 +480,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
   useEffect(
     () => () => {
       stopQrScanner();
+      qrScannerRef.current?.destroy();
+      qrScannerRef.current = null;
     },
     [],
   );
@@ -1083,7 +1147,16 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       return;
     }
 
-    setInvitationError(null);
+    const invitation = attendees.find((entry) => entry.id === invitationId);
+
+    if (invitation?.status === "CHECKED_IN") {
+      setCheckInError(null);
+      setCheckInNotice(buildCheckInNotice(invitation));
+      return;
+    }
+
+    setCheckInError(null);
+    setCheckInNotice(null);
 
     startInvitationTransition(() => {
       apiRequest<{ ok: boolean }>(
@@ -1108,9 +1181,20 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         )
         .then((items) => {
           setAttendees(items);
+          const checkedInInvitation = items.find((entry) => entry.id === invitationId);
+          const checkedInAt = formatCheckInTimestamp(
+            checkedInInvitation?.checkIns?.[0]?.checkedInAt,
+          );
+          setCheckInNotice({
+            tone: "success",
+            title: "Check-in erfolgreich",
+            detail: checkedInAt
+              ? `${checkedInInvitation?.contact.firstName ?? "Gast"} ${checkedInInvitation?.contact.lastName ?? ""} wurde um ${checkedInAt} eingecheckt.`
+              : "Der Gast wurde erfolgreich eingecheckt.",
+          });
         })
         .catch((error: Error) => {
-          setInvitationError(error.message);
+          setCheckInError(error.message);
         });
     });
   }
@@ -1128,7 +1212,8 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       return;
     }
 
-    setInvitationError(null);
+    setCheckInError(null);
+    setCheckInNotice(null);
 
     startInvitationTransition(() => {
       apiRequest<EventInvitationRecord>(
@@ -1141,13 +1226,14 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
           }),
         },
         session.accessToken,
-      )
+        )
         .then((preview) => {
           setCheckInPreview(preview);
           setCompanionPresent(preview.registration?.companionRequested === true);
+          setCheckInNotice(buildCheckInNotice(preview));
         })
         .catch((error: Error) => {
-          setInvitationError(error.message);
+          setCheckInError(error.message);
         });
     });
   }
@@ -1157,7 +1243,14 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       return;
     }
 
-    setInvitationError(null);
+    if (checkInPreview?.status === "CHECKED_IN") {
+      setCheckInError(null);
+      setCheckInNotice(buildCheckInNotice(checkInPreview));
+      return;
+    }
+
+    setCheckInError(null);
+    setCheckInNotice(null);
 
     startInvitationTransition(() => {
       apiRequest<{ ok: boolean }>(
@@ -1182,97 +1275,75 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
         )
         .then((items) => {
           setAttendees(items);
+          const checkedInInvitation = items.find((entry) => entry.id === checkInPreview?.id);
+          const checkedInAt = formatCheckInTimestamp(
+            checkedInInvitation?.checkIns?.[0]?.checkedInAt,
+          );
           setQrToken("");
+          stopQrScanner();
           setCheckInPreview(null);
           setCompanionPresent(false);
           setScannerError(null);
+          setCheckInNotice({
+            tone: "success",
+            title: "QR-Check-in erfolgreich",
+            detail: checkedInAt
+              ? `${checkedInInvitation?.contact.firstName ?? "Gast"} ${checkedInInvitation?.contact.lastName ?? ""} wurde um ${checkedInAt} eingecheckt.`
+              : "Der QR-Check-in wurde erfolgreich gespeichert.",
+          });
         })
         .catch((error: Error) => {
-          setInvitationError(error.message);
+          setCheckInError(error.message);
         });
     });
   }
 
   function stopQrScanner() {
-    if (qrFrameRef.current) {
-      window.cancelAnimationFrame(qrFrameRef.current);
-      qrFrameRef.current = null;
-    }
-
-    qrStreamRef.current?.getTracks().forEach((track) => track.stop());
-    qrStreamRef.current = null;
+    qrScannerRef.current?.stop();
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
 
     setIsScannerActive(false);
-    qrBusyRef.current = false;
-  }
-
-  function queueScanFrame() {
-    qrFrameRef.current = window.requestAnimationFrame(async () => {
-      const detector = qrDetectorRef.current;
-      const video = videoRef.current;
-
-      if (!detector || !video || video.readyState < 2) {
-        queueScanFrame();
-        return;
-      }
-
-      if (qrBusyRef.current) {
-        queueScanFrame();
-        return;
-      }
-
-      qrBusyRef.current = true;
-
-      try {
-        const [match] = await detector.detect(video);
-
-        if (match?.rawValue) {
-          stopQrScanner();
-          setQrToken(match.rawValue);
-          previewQrCheckIn(match.rawValue);
-          return;
-        }
-      } catch (error) {
-        setScannerError(error instanceof Error ? error.message : "QR-Scan fehlgeschlagen.");
-        stopQrScanner();
-        return;
-      } finally {
-        qrBusyRef.current = false;
-      }
-
-      queueScanFrame();
-    });
   }
 
   async function startQrScanner() {
-    if (!scannerSupported) {
+    if (!videoRef.current || !scannerSupported) {
       setScannerError(
-        scannerHint ?? "Dieser Browser unterstuetzt keinen nativen QR-Scan.",
+        scannerHint ?? "Dieser Browser unterstuetzt keinen Kamera-QR-Scan.",
       );
       return;
     }
 
     try {
+      const module = qrScannerModuleRef.current ?? (await import("qr-scanner"));
+      qrScannerModuleRef.current = module;
       setScannerError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-        },
-      });
+      setCheckInError(null);
+      setCheckInNotice(null);
 
-      qrStreamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      if (!qrScannerRef.current) {
+        qrScannerRef.current = new module.default(
+          videoRef.current,
+          (result: QrScannerResult) => {
+            stopQrScanner();
+            setQrToken(result.data);
+            previewQrCheckIn(result.data);
+          },
+          {
+            preferredCamera: "environment",
+            maxScansPerSecond: 8,
+            returnDetailedScanResult: true,
+            onDecodeError: () => {
+              // Continuous scanning should stay quiet while no code is visible.
+            },
+          },
+        );
       }
 
+      await qrScannerRef.current.start();
       setIsScannerActive(true);
-      queueScanFrame();
     } catch (error) {
       setScannerError(
         error instanceof Error
@@ -1281,6 +1352,48 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
       );
       stopQrScanner();
     }
+  }
+
+  function handleOpenQrCapture() {
+    qrFileInputRef.current?.click();
+  }
+
+  function handleQrImageCapture(event: ChangeEvent<HTMLInputElement>) {
+    const [file] = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const module = qrScannerModuleRef.current;
+
+    if (!module) {
+      setScannerError("QR-Fotoauswertung ist noch nicht bereit. Bitte erneut versuchen.");
+      return;
+    }
+
+    setScannerError(null);
+    setCheckInError(null);
+    setCheckInNotice(null);
+
+    startInvitationTransition(() => {
+      module.default
+        .scanImage(file, { returnDetailedScanResult: true })
+        .then((result: QrScannerResult) => {
+          setQrToken(result.data);
+          previewQrCheckIn(result.data);
+        })
+        .catch((error: Error | string) => {
+          const message =
+            typeof error === "string"
+              ? error
+              : error instanceof Error
+                ? error.message
+                : "QR-Code konnte im Foto nicht erkannt werden.";
+          setScannerError(message);
+        });
+    });
   }
 
   const selectedContactsCount = selectedContactIds.length;
@@ -2584,73 +2697,127 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                   ) : (
                     <>
                       {invitationError ? <p className="error-box">{invitationError}</p> : null}
+                      {checkInError ? <p className="error-box">{checkInError}</p> : null}
+                      {checkInNotice ? (
+                        <div
+                          className={`checkin-notice checkin-notice-${checkInNotice.tone}`}
+                        >
+                          <p className="section-label">{checkInNotice.title}</p>
+                          <p>{checkInNotice.detail}</p>
+                        </div>
+                      ) : null}
 
-                      <div className="qr-checkin-box">
-                        <div className="scanner-toolbar">
-                          <button
-                            className="ghost-button"
-                            disabled={isSubmittingInvitations || !scannerSupported || isScannerActive}
-                            onClick={startQrScanner}
-                            type="button"
-                          >
-                            Kamera-Scan starten
-                          </button>
-                          {isScannerActive ? (
+                      <div className="checkin-layout">
+                        <div className="qr-checkin-box">
+                          <div className="scanner-toolbar">
                             <button
                               className="ghost-button"
-                              onClick={stopQrScanner}
+                              disabled={
+                                isSubmittingInvitations || !scannerSupported || isScannerActive
+                              }
+                              onClick={startQrScanner}
                               type="button"
                             >
-                              Scan stoppen
+                              Kamera-Scan starten
                             </button>
-                          ) : null}
-                        </div>
-
-                        {scannerSupported ? (
-                          <div className="scanner-frame">
-                            <video
-                              autoPlay
-                              className="scanner-video"
-                              muted
-                              playsInline
-                              ref={videoRef}
-                            />
-                            {!isScannerActive ? (
-                              <p className="scanner-placeholder">
-                                Kamera aus. Du kannst den Scan starten oder den Token manuell
-                                einfuegen.
-                              </p>
+                            <button
+                              className="ghost-button"
+                              disabled={isSubmittingInvitations}
+                              onClick={handleOpenQrCapture}
+                              type="button"
+                            >
+                              Kamera-Foto pruefen
+                            </button>
+                            {isScannerActive ? (
+                              <button
+                                className="ghost-button"
+                                onClick={stopQrScanner}
+                                type="button"
+                              >
+                                Scan stoppen
+                              </button>
                             ) : null}
                           </div>
-                        ) : (
-                          <p className="empty-state">
-                            {scannerHint ??
-                              "Dieser Browser bietet keinen nativen QR-Scan. Nutze in diesem Fall die manuelle Eingabe."}
-                          </p>
-                        )}
 
-                        {scannerError ? <p className="error-box">{scannerError}</p> : null}
+                          {scannerSupported ? (
+                            <div className="scanner-frame">
+                              <video
+                                autoPlay
+                                className="scanner-video"
+                                muted
+                                playsInline
+                                ref={videoRef}
+                              />
+                              {!isScannerActive ? (
+                                <p className="scanner-placeholder">
+                                  Kamera aus. Du kannst den Scan starten oder den Token manuell
+                                  einfuegen.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="empty-state">
+                              {scannerHint ??
+                                "Dieser Browser bietet keinen Kamera-QR-Scan. Nutze in diesem Fall die manuelle Eingabe oder ein Kamera-Foto."}
+                            </p>
+                          )}
 
-                        <label className="field field-wide">
-                          <span>QR-Token scannen oder einfuegen</span>
+                          {scannerError ? <p className="error-box">{scannerError}</p> : null}
                           <input
-                            onChange={(event) => setQrToken(event.target.value)}
-                            placeholder="Signierter QR-Token"
-                            value={qrToken}
+                            accept="image/*"
+                            capture="environment"
+                            className="visually-hidden"
+                            onChange={handleQrImageCapture}
+                            ref={qrFileInputRef}
+                            type="file"
                           />
-                        </label>
-                        <button
-                          className="ghost-button"
-                          disabled={isSubmittingInvitations || !qrToken.trim()}
-                          onClick={handleQrCheckIn}
-                          type="button"
-                        >
-                          QR pruefen
-                        </button>
+
+                          <label className="field field-wide">
+                            <span>QR-Token scannen oder einfuegen</span>
+                            <input
+                              onChange={(event) => setQrToken(event.target.value)}
+                              placeholder="Signierter QR-Token"
+                              value={qrToken}
+                            />
+                          </label>
+                          <button
+                            className="ghost-button"
+                            disabled={isSubmittingInvitations || !qrToken.trim()}
+                            onClick={handleQrCheckIn}
+                            type="button"
+                          >
+                            QR pruefen
+                          </button>
+                        </div>
+
+                        <aside className="checkin-help-card">
+                          <p className="section-label">Ablauf am Einlass</p>
+                          <h3>Schneller Ablauf</h3>
+                          <ol className="checkin-steps">
+                            <li>Aktives Event waehlen.</li>
+                            <li>QR-Code scannen oder Token einfuegen.</li>
+                            <li>Namen und Begleitung kurz pruefen.</li>
+                            <li>Check-in final bestaetigen.</li>
+                          </ol>
+                          <p className="checkin-help-note">
+                            Falls ein Gast bereits eingecheckt ist, zeigt die Vorschau einen
+                            Warnhinweis statt einer erneuten Freigabe.
+                          </p>
+                          <p className="checkin-help-note">
+                            Auf iPhone und iPad kann statt Live-Scan auch direkt ein Kamera-Foto
+                            des QR-Codes aufgenommen und geprueft werden.
+                          </p>
+                        </aside>
                       </div>
 
                       {checkInPreview ? (
-                        <div className="checkin-preview">
+                        <div
+                          className={`checkin-preview ${
+                            checkInPreview.status === "CHECKED_IN"
+                              ? "checkin-preview-warning"
+                              : ""
+                          }`}
+                        >
                           <p className="section-label">Scan erkannt</p>
                           <h3>
                             {checkInPreview.contact.firstName}{" "}
@@ -2688,7 +2855,9 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                             onClick={() => submitQrCheckIn(qrToken.trim())}
                             type="button"
                           >
-                            Check-in bestaetigen
+                            {checkInPreview.status === "CHECKED_IN"
+                              ? "Bereits eingecheckt"
+                              : "Check-in bestaetigen"}
                           </button>
                         </div>
                       ) : null}

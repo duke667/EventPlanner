@@ -559,6 +559,18 @@ h3,
   line-height: 1.5;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .template-field-grid {
   display: flex;
   flex-wrap: wrap;
@@ -579,7 +591,67 @@ h3,
 .qr-checkin-box {
   display: grid;
   gap: 12px;
+}
+
+.checkin-layout {
+  display: grid;
+  gap: 18px;
   margin-bottom: 18px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+}
+
+.checkin-help-card,
+.checkin-notice {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.checkin-help-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.checkin-help-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.checkin-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  color: var(--text);
+}
+
+.checkin-help-note,
+.checkin-notice p:last-child {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.checkin-notice {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.checkin-notice p {
+  margin: 0;
+}
+
+.checkin-notice-success {
+  border-color: rgba(84, 130, 53, 0.22);
+  background: rgba(84, 130, 53, 0.08);
+}
+
+.checkin-notice-warning {
+  border-color: rgba(176, 112, 0, 0.24);
+  background: rgba(176, 112, 0, 0.08);
 }
 
 .checkin-preview {
@@ -590,6 +662,11 @@ h3,
   background: rgba(84, 130, 53, 0.08);
   border-radius: var(--radius-md);
   padding: 16px;
+}
+
+.checkin-preview-warning {
+  border-color: rgba(176, 112, 0, 0.24);
+  background: rgba(176, 112, 0, 0.08);
 }
 
 .checkin-preview h3 {
@@ -757,6 +834,32 @@ h3,
 .attendee-head small,
 .attendee-meta {
   color: var(--muted);
+}
+
+@media (max-width: 980px) {
+  .checkin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .scanner-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .scanner-toolbar button,
+  .checkin-preview .primary-button,
+  .qr-checkin-box .ghost-button {
+    width: 100%;
+  }
+
+  .checkin-preview,
+  .checkin-help-card,
+  .checkin-notice,
+  .qr-checkin-box {
+    padding: 14px;
+  }
 }
 
 .contact-card {
