@@ -90,6 +90,7 @@ Standardmaessig verschickt das Testsystem Mails an Mailpit:
 ```env
 MAIL_FROM=events-test@example.com
 MAIL_TRANSPORT_URL=smtp://mailpit:1025
+MAIL_TLS_REJECT_UNAUTHORIZED=true
 ```
 
 Fuer echte Test-Mails muss `MAIL_TRANSPORT_URL` in `.env.test` auf einen erreichbaren SMTP-Server zeigen. Beispiele:
@@ -97,6 +98,7 @@ Fuer echte Test-Mails muss `MAIL_TRANSPORT_URL` in `.env.test` auf einen erreich
 ```env
 MAIL_FROM=veranstaltungen@example.com
 MAIL_TRANSPORT_URL=smtp://SMTP_USER:SMTP_PASS@smtp.example.com:587?secure=false
+MAIL_TLS_REJECT_UNAUTHORIZED=true
 ```
 
 oder fuer Port 465 mit implizitem TLS:
@@ -104,7 +106,16 @@ oder fuer Port 465 mit implizitem TLS:
 ```env
 MAIL_FROM=veranstaltungen@example.com
 MAIL_TRANSPORT_URL=smtps://SMTP_USER:SMTP_PASS@smtp.example.com:465
+MAIL_TLS_REJECT_UNAUTHORIZED=true
 ```
+
+Falls der SMTP-Server mit einer internen oder selbstsignierten Zertifikatskette arbeitet und der Versand mit `self-signed certificate in certificate chain` fehlschlaegt, kann fuer das Testsystem ausnahmsweise gesetzt werden:
+
+```env
+MAIL_TLS_REJECT_UNAUTHORIZED=false
+```
+
+Das deaktiviert die TLS-Zertifikatspruefung fuer den SMTP-Transport und sollte nur in kontrollierten internen Umgebungen verwendet werden.
 
 Nach Aenderung der Mail-Konfiguration:
 

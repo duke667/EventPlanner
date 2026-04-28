@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import ical, { ICalCalendarMethod } from "ical-generator";
 import nodemailer from "nodemailer";
+import SMTPTransport from "nodemailer/lib/smtp-transport";
 import QRCode from "qrcode";
 import { GuestTokenService } from "../guest/guest-token.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -75,9 +76,7 @@ export class MailService {
       return { processed: 0 };
     }
 
-    const transporter = nodemailer.createTransport(
-      this.configService.get<string>("MAIL_TRANSPORT_URL") ?? "smtp://localhost:1025",
-    );
+    const transporter = this.createTransporter();
 
     let processed = 0;
     let failed = 0;
@@ -132,9 +131,7 @@ export class MailService {
   }
 
   async sendConfirmationForInvitation(invitationId: string) {
-    const transporter = nodemailer.createTransport(
-      this.configService.get<string>("MAIL_TRANSPORT_URL") ?? "smtp://localhost:1025",
-    );
+    const transporter = this.createTransporter();
     const job = await this.prisma.emailJob.create({
       data: {
         eventInvitationId: invitationId,
@@ -341,6 +338,42 @@ export class MailService {
         errorMessage: message,
       },
     });
+  }
+
+  private createTransporter() {
+    const transportUrl =
+      this.configService.get<string>("MAIL_TRANSPORT_URL") ?? "smtp://localhost:1025";
+    const rejectUnauthorized = this.parseBooleanConfig(
+      this.configService.get<string>("MAIL_TLS_REJECT_UNAUTHORIZED"),
+      true,
+    );
+
+    const options: SMTPTransport.Options = {
+      url: transportUrl,
+      tls: {
+        rejectUnauthorized,
+      },
+    };
+
+    return nodemailer.createTransport(options);
+  }
+
+  private parseBooleanConfig(value: string | undefined, defaultValue: boolean) {
+    if (value === undefined) {
+      return defaultValue;
+    }
+
+    const normalized = value.trim().toLowerCase();
+
+    if (["true", "1", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+
+    if (["false", "0", "no", "off"].includes(normalized)) {
+      return false;
+    }
+
+    return defaultValue;
   }
 
   private readTemplatePayload(templateType: string): InvitationTemplatePayload {
