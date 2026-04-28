@@ -108,3 +108,9 @@ cp .env.test.example .env.test
 docker-compose -f docker-compose.testsystem.yml --env-file .env.test up -d --build
 docker-compose -f docker-compose.testsystem.yml --env-file .env.test --profile tools run --rm seed-admin
 ```
+
+Hinweis zum Mailversand im Testsystem:
+
+- fuer interne SMTP-Relays auf Port `25` kann `MAIL_TRANSPORT_URL=smtp://SMTP_RELAY_HOST:25?ignoreTLS=true` erforderlich sein
+- `MAIL_TLS_REJECT_UNAUTHORIZED=false` allein hat bei internen Relay-Setups mit problematischer `STARTTLS`-Zertifikatskette nicht immer gereicht
+- Details und weitere SMTP-Beispiele stehen in [docs/deployment-testsystem.md](./docs/deployment-testsystem.md)

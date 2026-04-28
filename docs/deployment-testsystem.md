@@ -109,6 +109,14 @@ MAIL_TRANSPORT_URL=smtps://SMTP_USER:SMTP_PASS@smtp.example.com:465
 MAIL_TLS_REJECT_UNAUTHORIZED=true
 ```
 
+oder fuer einen internen SMTP-Relay auf Port 25 ohne TLS-Upgrade:
+
+```env
+MAIL_FROM=veranstaltungen@example.com
+MAIL_TRANSPORT_URL=smtp://SMTP_RELAY_HOST:25?ignoreTLS=true
+MAIL_TLS_REJECT_UNAUTHORIZED=false
+```
+
 Falls der SMTP-Server mit einer internen oder selbstsignierten Zertifikatskette arbeitet und der Versand mit `self-signed certificate in certificate chain` fehlschlaegt, kann fuer das Testsystem ausnahmsweise gesetzt werden:
 
 ```env
@@ -117,10 +125,12 @@ MAIL_TLS_REJECT_UNAUTHORIZED=false
 
 Das deaktiviert die TLS-Zertifikatspruefung fuer den SMTP-Transport und sollte nur in kontrollierten internen Umgebungen verwendet werden.
 
+Wichtig: In unserem Test mit einem internen Relay auf Port `25` hat `MAIL_TLS_REJECT_UNAUTHORIZED=false` allein nicht gereicht. Erst mit `?ignoreTLS=true` in `MAIL_TRANSPORT_URL` funktionierte der Versand stabil, weil dadurch das `STARTTLS`-Upgrade komplett unterbunden wurde.
+
 Nach Aenderung der Mail-Konfiguration:
 
 ```bash
-docker compose -f docker-compose.testsystem.yml --env-file .env.test up -d --force-recreate api
+docker compose -f docker-compose.testsystem.yml --env-file .env.test up -d --build api
 ```
 
 Falls Sonderzeichen im SMTP-Benutzer oder Passwort enthalten sind, muessen sie URL-kodiert werden. Beispiel: `@` wird `%40`, `:` wird `%3A`, `/` wird `%2F`.
