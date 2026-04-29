@@ -73,7 +73,7 @@ export class MailService {
     });
 
     if (jobs.length === 0) {
-      return { processed: 0 };
+      return { processed: 0, failed: 0, errors: [] };
     }
 
     const transporter = this.createTransporter();
@@ -347,9 +347,24 @@ export class MailService {
       this.configService.get<string>("MAIL_TLS_REJECT_UNAUTHORIZED"),
       true,
     );
+    const connectionTimeout = this.parseNumberConfig(
+      this.configService.get<string>("MAIL_CONNECTION_TIMEOUT_MS"),
+      10000,
+    );
+    const greetingTimeout = this.parseNumberConfig(
+      this.configService.get<string>("MAIL_GREETING_TIMEOUT_MS"),
+      10000,
+    );
+    const socketTimeout = this.parseNumberConfig(
+      this.configService.get<string>("MAIL_SOCKET_TIMEOUT_MS"),
+      20000,
+    );
 
     const options: SMTPTransport.Options = {
       url: transportUrl,
+      connectionTimeout,
+      greetingTimeout,
+      socketTimeout,
       tls: {
         rejectUnauthorized,
       },
@@ -374,6 +389,15 @@ export class MailService {
     }
 
     return defaultValue;
+  }
+
+  private parseNumberConfig(value: string | undefined, defaultValue: number) {
+    if (value === undefined) {
+      return defaultValue;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
   }
 
   private readTemplatePayload(templateType: string): InvitationTemplatePayload {

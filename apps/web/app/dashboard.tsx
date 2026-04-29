@@ -1085,7 +1085,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
     }
 
     setInvitationError(null);
-    setInvitationSuccess(null);
+    setInvitationSuccess("Mailversand wird gestartet...");
 
     startInvitationTransition(() => {
       apiRequest<{

@@ -91,6 +91,9 @@ Standardmaessig verschickt das Testsystem Mails an Mailpit:
 MAIL_FROM=events-test@example.com
 MAIL_TRANSPORT_URL=smtp://mailpit:1025
 MAIL_TLS_REJECT_UNAUTHORIZED=true
+MAIL_CONNECTION_TIMEOUT_MS=10000
+MAIL_GREETING_TIMEOUT_MS=10000
+MAIL_SOCKET_TIMEOUT_MS=20000
 ```
 
 Fuer echte Test-Mails muss `MAIL_TRANSPORT_URL` in `.env.test` auf einen erreichbaren SMTP-Server zeigen. Beispiele:
@@ -99,6 +102,9 @@ Fuer echte Test-Mails muss `MAIL_TRANSPORT_URL` in `.env.test` auf einen erreich
 MAIL_FROM=veranstaltungen@example.com
 MAIL_TRANSPORT_URL=smtp://SMTP_USER:SMTP_PASS@smtp.example.com:587?secure=false
 MAIL_TLS_REJECT_UNAUTHORIZED=true
+MAIL_CONNECTION_TIMEOUT_MS=10000
+MAIL_GREETING_TIMEOUT_MS=10000
+MAIL_SOCKET_TIMEOUT_MS=20000
 ```
 
 oder fuer Port 465 mit implizitem TLS:
@@ -107,6 +113,9 @@ oder fuer Port 465 mit implizitem TLS:
 MAIL_FROM=veranstaltungen@example.com
 MAIL_TRANSPORT_URL=smtps://SMTP_USER:SMTP_PASS@smtp.example.com:465
 MAIL_TLS_REJECT_UNAUTHORIZED=true
+MAIL_CONNECTION_TIMEOUT_MS=10000
+MAIL_GREETING_TIMEOUT_MS=10000
+MAIL_SOCKET_TIMEOUT_MS=20000
 ```
 
 oder fuer einen internen SMTP-Relay auf Port 25 ohne TLS-Upgrade:
@@ -115,6 +124,9 @@ oder fuer einen internen SMTP-Relay auf Port 25 ohne TLS-Upgrade:
 MAIL_FROM=veranstaltungen@example.com
 MAIL_TRANSPORT_URL=smtp://SMTP_RELAY_HOST:25?ignoreTLS=true
 MAIL_TLS_REJECT_UNAUTHORIZED=false
+MAIL_CONNECTION_TIMEOUT_MS=10000
+MAIL_GREETING_TIMEOUT_MS=10000
+MAIL_SOCKET_TIMEOUT_MS=20000
 ```
 
 Falls der SMTP-Server mit einer internen oder selbstsignierten Zertifikatskette arbeitet und der Versand mit `self-signed certificate in certificate chain` fehlschlaegt, kann fuer das Testsystem ausnahmsweise gesetzt werden:
@@ -126,6 +138,8 @@ MAIL_TLS_REJECT_UNAUTHORIZED=false
 Das deaktiviert die TLS-Zertifikatspruefung fuer den SMTP-Transport und sollte nur in kontrollierten internen Umgebungen verwendet werden.
 
 Wichtig: In unserem Test mit einem internen Relay auf Port `25` hat `MAIL_TLS_REJECT_UNAUTHORIZED=false` allein nicht gereicht. Erst mit `?ignoreTLS=true` in `MAIL_TRANSPORT_URL` funktionierte der Versand stabil, weil dadurch das `STARTTLS`-Upgrade komplett unterbunden wurde.
+
+Wenn der Mailserver bei Verbindungsaufbau oder SMTP-Greeting haengt, koennen die Timeouts ueber `MAIL_CONNECTION_TIMEOUT_MS`, `MAIL_GREETING_TIMEOUT_MS` und `MAIL_SOCKET_TIMEOUT_MS` enger gesetzt werden. Standard im Projekt sind derzeit `10000`, `10000` und `20000` Millisekunden.
 
 Nach Aenderung der Mail-Konfiguration:
 
