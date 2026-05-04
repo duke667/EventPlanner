@@ -176,6 +176,12 @@ Das bedeutet:
 - extern fuer direkte API-Aufrufe oder spaeteren Proxy: `NEXT_PUBLIC_API_URL=https://api.events-test.example.com`
 - falsch: `NEXT_PUBLIC_API_URL=https://api.events-test.example.com/api`
 
+Wichtig: `API_INTERNAL_URL` wird fuer die Next.js-Rewrite-Regel bereits beim Web-Image-Build verwendet. Wenn dieser Wert geaendert wird oder beim Build fehlt, kann das Web-Image API-Aufrufe auf eine falsche externe URL backen. Danach muss der Web-Container mit Build neu erzeugt werden:
+
+```bash
+docker compose -f docker-compose.testsystem.yml --env-file .env.test up -d --build web
+```
+
 ## Admin-Seed
 
 Der Seed ist fuer das Testsystem env-gesteuert:
