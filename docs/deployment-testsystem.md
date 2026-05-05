@@ -62,6 +62,8 @@ docker-compose -f docker-compose.testsystem.yml --env-file .env.test logs api --
 docker-compose -f docker-compose.testsystem.yml --env-file .env.test logs web --tail 100
 ```
 
+Das Testsystem verwendet ein explizites Docker-Netz `eventplanner_app`. Darueber loest der Web-Container die API intern als `http://api:4000` auf. Falls Login oder API-Proxy mit `getaddrinfo ENOTFOUND api` fehlschlagen, haengen die Container nicht im erwarteten App-Netz.
+
 ## Erster Test
 
 Nach dem Start pruefen:
