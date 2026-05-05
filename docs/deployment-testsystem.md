@@ -62,7 +62,13 @@ docker-compose -f docker-compose.testsystem.yml --env-file .env.test logs api --
 docker-compose -f docker-compose.testsystem.yml --env-file .env.test logs web --tail 100
 ```
 
-Das Testsystem verwendet ein explizites Docker-Netz `eventplanner_app`. Darueber loest der Web-Container die API intern als `http://api:4000` auf. Falls Login oder API-Proxy mit `getaddrinfo ENOTFOUND api` fehlschlagen, haengen die Container nicht im erwarteten App-Netz.
+Das Testsystem verwendet ein explizites Docker-Netz `eventplanner_app`. Darueber sollte der Web-Container die API intern als `http://api:4000` aufloesen koennen. Falls Login oder API-Proxy mit `getaddrinfo ENOTFOUND api` fehlschlagen oder Container-zu-Container-Verbindungen im Bridge-Netz timeouten, kann der Web-Container die API ueber den Docker-Host-Gateway erreichen:
+
+```env
+API_INTERNAL_URL=http://host.docker.internal:4000
+```
+
+Der Web-Service traegt dafuer `host.docker.internal` per `host-gateway` ein. Nach Aenderung von `API_INTERNAL_URL` muss das Web-Image neu gebaut werden.
 
 ## Erster Test
 
@@ -174,7 +180,8 @@ Aktuelle Annahme im Frontend:
 
 Das bedeutet:
 
-- intern im Compose-Setup: `API_INTERNAL_URL=http://api:4000`
+- intern im normalen Compose-Setup: `API_INTERNAL_URL=http://api:4000`
+- Fallback bei defekter Docker-DNS- oder Bridge-Kommunikation: `API_INTERNAL_URL=http://host.docker.internal:4000`
 - extern fuer direkte API-Aufrufe oder spaeteren Proxy: `NEXT_PUBLIC_API_URL=https://api.events-test.example.com`
 - falsch: `NEXT_PUBLIC_API_URL=https://api.events-test.example.com/api`
 

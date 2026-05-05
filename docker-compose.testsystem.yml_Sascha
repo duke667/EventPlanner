@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     networks:
-      - eventplanner_default
+      - app
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-eventmanager}
       POSTGRES_USER: ${POSTGRES_USER:-eventmanager}
@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     networks:
-      - eventplanner_default
+      - app
     volumes:
       - redis_data:/data
     healthcheck:
@@ -33,7 +33,7 @@ services:
     image: axllent/mailpit:latest
     restart: unless-stopped
     networks:
-      - eventplanner_default
+      - app
     ports:
       - "${MAILPIT_HTTP_PORT:-8025}:8025"
 
@@ -43,7 +43,9 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     networks:
-      - eventplanner_default 
+      app:
+        aliases:
+          - api
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,7 +67,7 @@ services:
       dockerfile: apps/api/Dockerfile
     profiles: ["tools"]
     networks:
-      - eventplanner_default
+      - app
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,14 +89,16 @@ services:
         API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
     restart: unless-stopped
     networks:
-      - eventplanner_default
+      - app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - api
     env_file:
       - .env.test
     environment:
       PORT: 3000
-      API_INTERNAL_URL: http://api:4000
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
@@ -105,5 +109,5 @@ volumes:
   redis_data:
 
 networks:
-  eventplanner_default:
-    external: true
+  app:
+    name: eventplanner_app
