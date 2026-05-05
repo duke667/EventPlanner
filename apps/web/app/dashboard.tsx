@@ -2041,7 +2041,7 @@ export function Dashboard({ section = "overview" }: { section?: BackofficeSectio
                   </div>
 
                   <label className="field">
-                    <span>Location</span>
+                    <span>Ort der Veranstaltung</span>
                     <input
                       onChange={(event) =>
                         setEventForm((current) => ({
