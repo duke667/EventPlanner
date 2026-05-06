@@ -138,16 +138,9 @@ export class GuestService {
     if (
       response === RegistrationResponse.ACCEPTED &&
       !wasAccepted &&
-      (await this.shouldQueueConfirmation(invitation.id))
+      (await this.shouldSendConfirmation(invitation.id))
     ) {
-      await this.prisma.emailJob.create({
-        data: {
-          eventId: invitation.eventId,
-          eventInvitationId: invitation.id,
-          templateType: "CONFIRMATION",
-          status: "QUEUED",
-        },
-      });
+      await this.mailService.sendConfirmationForInvitation(invitation.id);
     }
 
     return {
@@ -181,7 +174,7 @@ export class GuestService {
     return `${token}`;
   }
 
-  private async shouldQueueConfirmation(invitationId: string) {
+  private async shouldSendConfirmation(invitationId: string) {
     const existingConfirmationJob = await this.prisma.emailJob.findFirst({
       where: {
         eventInvitationId: invitationId,
