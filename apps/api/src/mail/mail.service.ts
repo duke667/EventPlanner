@@ -264,8 +264,8 @@ export class MailService {
       text: bodyWithFallback,
       html: [
         this.textToHtml(body),
-        `<p><strong>Persoenlicher Einladungsbereich:</strong><br /><a href="${this.escapeHtml(invitationUrl)}">${this.escapeHtml(invitationUrl)}</a></p>`,
-        `<p><strong>Code-Eingabe:</strong><br /><a href="${this.escapeHtml(this.getGuestCodeUrl())}">${this.escapeHtml(this.getGuestCodeUrl())}</a></p>`,
+        `<p><a href="${this.escapeHtml(invitationUrl)}">Zur Anmeldung</a></p>`,
+        `<p><a href="${this.escapeHtml(this.getGuestCodeUrl())}">Einladungscode eingeben</a></p>`,
         `<p><strong>Einladungscode zum Abtippen:</strong><br /><code>${this.escapeHtml(this.formatInvitationCode(invitationCode))}</code></p>`,
       ].join(""),
     });
@@ -623,10 +623,29 @@ export class MailService {
   private textToHtml(value: string) {
     return value
       .split(/\n{2,}/)
-      .map((paragraph) =>
-        `<p>${this.escapeHtml(paragraph.trim()).replace(/\n/g, "<br />")}</p>`,
-      )
+      .map((paragraph) => `<p>${this.formatHtmlParagraph(paragraph.trim())}</p>`)
       .join("");
+  }
+
+  private formatHtmlParagraph(value: string) {
+    return this.escapeHtml(value)
+      .replace(
+        /https?:\/\/[^\s<]+/g,
+        (url) => `<a href="${url}">${this.describeLink(url)}</a>`,
+      )
+      .replace(/\n/g, "<br />");
+  }
+
+  private describeLink(url: string) {
+    if (url.includes("/guest/")) {
+      return "Zur Anmeldung";
+    }
+
+    if (url.includes("/guest")) {
+      return "Einladungscode eingeben";
+    }
+
+    return "Link oeffnen";
   }
 
   private escapeHtml(value: string) {
